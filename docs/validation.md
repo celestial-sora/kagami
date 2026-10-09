@@ -18,7 +18,17 @@ Passed locally on this Fedora machine:
 - GStreamer 1.28.7 plugins, bounded ICE properties and three clean receiver/ICE teardowns with fatal criticals enabled.
 - Installer dry run and read-only selection of the installed kernel/development pair.
 
-Still pending on this machine: full privileged installer execution (sudo requires the desktop user's password), building/loading v4l2loopback and boot-service/ACL/firewall verification. Only the physical UVC camera's video0/video1 devices exist; no Kagami loopback is installed. Native window operation/visual inspection, generated frames in OBS, physical Android CA trust/capture, phone-to-GStreamer/V4L2/OBS, reconnects, 15-minute measurements and USB remain unverified. These local automated checks do not close Phase 0.
+Following the user's installation of `dd27600`, the active app/launcher and HTTPS config are present, v4l2loopback 0.15.4 is installed, and a module exists for 7.2.9. The camera service is enabled but inactive while 7.2.8 is still running. The user's screenshot at 22:00 confirms the native Fedora window starts and reports the missing `/dev/video10`; this does not prove successful host/media operation.
+
+Multiple-kernel installer batch on `fix/multiple-fedora-kernels`:
+
+- Read-only inventory finds installed 7.2.7, 7.2.8 and 7.2.9, all x86_64. At the start of this batch only 7.2.9 has development files and a camera module.
+- The signed Fedora Koji archive returns HTTP 200 for the exact 7.2.7 and 7.2.8 development RPMs. The downloaded 7.2.8 RPM passes `rpmkeys --checksig` (digests/signatures OK), has the expected package identity, and uses the same Fedora key as its installed kernel. This verifies the archive package, not installation or module compilation for 7.2.8.
+- The installed akmods package has the kernel-install hook, kernel-specific service, enabled boot service and matching-development package dependencies. These existing paths are reused for future kernel updates.
+- 31 Python tests pass. The new cases cover all installed kernel versions, architecture filtering, signed archive path construction, rejecting unsafe/unsigned metadata, preserving versions during exact-development transactions, enforced DNF signature checking, per-kernel akmods calls and detecting an incorrect module `vermagic` even when the builder reports success. These tests simulate package/build commands; they do not install packages or load modules.
+- Shell syntax, ShellCheck 0.11.0 and `git diff --check` pass.
+
+Still pending: executing the revised installer with the desktop user's sudo password; real module builds for 7.2.7/7.2.8, camera creation/loading on the running kernel, boot/ACL/firewall verification and switching between kernels. Only the physical UVC camera's video0/video1 devices currently exist. Generated frames in OBS, physical Android CA trust/capture, phone-to-GStreamer/V4L2/OBS, reconnects, 15-minute measurements and USB remain unverified. These checks do not close Phase 0.
 
 ## Verified in the authoring environment
 

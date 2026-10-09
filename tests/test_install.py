@@ -32,7 +32,107 @@ kagami_select_kernel "$2"
                           env=env, capture_output=True, text=True)
 
 
+def installer_shell(script, **variables):
+    return subprocess.run(["bash", "-c", 'source "$1"\n' + script,
+                           "installer-test", str(ROOT / "install.sh")],
+                          env={**os.environ, **variables}, capture_output=True, text=True)
+
+
 class InstallerTests(unittest.TestCase):
+    def test_installed_kernel_inventory_includes_older_versions_and_filters_arch(self):
+        result = installer_shell('''
+uname() { printf 'x86_64\\n'; }
+rpm() { printf '%s\\n' '7.2.9-200.fc44.x86_64' '7.2.7-200.fc44.x86_64' '7.2.9-200.fc44.x86_64' '7.2.10-200.fc44.aarch64'; }
+kagami_installed_kernels
+''')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines(), ["7.2.7-200.fc44.x86_64", "7.2.9-200.fc44.x86_64"])
+
+    def test_archive_url_uses_installed_kernel_version_and_signing_key(self):
+        for version, release, key in (("7.2.8", "200.fc44", "dbfcf71c6d9f90a6"),
+                                      ("6.19.10", "300.fc44", "01234567ABCDEF12")):
+            kernel = f"{version}-{release}.x86_64"
+            result = installer_shell('''
+uname() { printf 'x86_64\\n'; }
+rpm() { printf 'RSA/SHA256, date, Key ID %s' "$KAGAMI_TEST_KEY"; }
+kagami_kernel_devel_url "$KAGAMI_TEST_KERNEL"
+''', KAGAMI_TEST_KERNEL=kernel, KAGAMI_TEST_KEY=key)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.strip(),
+                             f"https://kojipkgs.fedoraproject.org/packages/kernel/{version}/{release}/"
+                             f"data/signed/{key[-8:].lower()}/x86_64/kernel-devel-{kernel}.rpm")
+
+    def test_archive_url_rejects_unsigned_foreign_and_unsafe_kernels(self):
+        for kernel, key in (("../../kernel", "dbfcf71c6d9f90a6"),
+                            ("7.2.8-200.el10.x86_64", "dbfcf71c6d9f90a6"),
+                            ("7.2.8-200.fc44.aarch64", "dbfcf71c6d9f90a6"),
+                            ("7.2.8-200.fc44.x86_64", "(none)")):
+            result = installer_shell('''
+uname() { printf 'x86_64\\n'; }
+rpm() { printf 'Key ID %s' "$KAGAMI_TEST_KEY"; }
+kagami_kernel_devel_url "$KAGAMI_TEST_KERNEL"
+''', KAGAMI_TEST_KERNEL=kernel, KAGAMI_TEST_KEY=key)
+            self.assertEqual(result.returncode, 1, result.stderr)
+            self.assertEqual(result.stdout, "")
+
+    def test_devel_install_preserves_versions_and_requires_signed_archive_rpm(self):
+        for mode in ("ready", "repository", "archive", "unavailable"):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory(prefix="kagami kernel ") as directory:
+                calls, marker = Path(directory) / "calls", Path(directory) / "ready"
+                calls.touch()
+                if mode == "ready":
+                    marker.touch()
+                result = installer_shell('''
+uname() { printf 'x86_64\\n'; }
+rpm() { printf 'Key ID dbfcf71c6d9f90a6'; }
+kagami_kernel_ready() { [[ -f $KAGAMI_TEST_MARKER ]]; }
+sudo() {
+    printf '%s\\n' "$*" >> "$KAGAMI_TEST_CALLS"
+    if [[ $KAGAMI_TEST_MODE == repository || ( $KAGAMI_TEST_MODE == archive && $* == *https://* ) ]]; then
+        touch "$KAGAMI_TEST_MARKER"; return 0
+    fi
+    return 1
+}
+kagami_ensure_kernel_devel '7.2.8-200.fc44.x86_64'
+''', KAGAMI_TEST_MODE=mode, KAGAMI_TEST_MARKER=str(marker), KAGAMI_TEST_CALLS=str(calls))
+                self.assertEqual(result.returncode, 1 if mode == "unavailable" else 0, result.stderr)
+                commands = calls.read_text().splitlines()
+                self.assertEqual(len(commands), {"ready": 0, "repository": 1, "archive": 2, "unavailable": 2}[mode])
+                for command in commands:
+                    self.assertIn("--setopt=installonly_limit=0", command)
+                if len(commands) == 2:
+                    self.assertIn("--setopt=localpkg_gpgcheck=True", commands[1])
+                    self.assertIn("/data/signed/6d9f90a6/", commands[1])
+
+    def test_camera_preparation_builds_every_installed_kernel(self):
+        self._check_camera_preparation(mismatch=False)
+
+    def test_camera_preparation_rejects_a_module_for_the_wrong_kernel(self):
+        self._check_camera_preparation(mismatch=True)
+
+    def _check_camera_preparation(self, mismatch):
+        kernels = [f"7.2.{patch}-200.fc44.x86_64" for patch in (7, 8, 9)]
+        with tempfile.TemporaryDirectory() as directory:
+            calls = Path(directory) / "calls"
+            result = installer_shell('''
+kagami_installed_kernels() { printf '%s\\n' "$KAGAMI_TEST_KERNELS"; }
+kagami_ensure_kernel_devel() { printf 'devel %s\\n' "$1" >> "$KAGAMI_TEST_CALLS"; }
+sudo() { printf '%s\\n' "$*" >> "$KAGAMI_TEST_CALLS"; }
+modinfo() {
+    if [[ $KAGAMI_TEST_MISMATCH == 1 && $2 == 7.2.8-* ]]; then printf 'wrong-kernel SMP\\n';
+    else printf '%s SMP\\n' "$2"; fi
+}
+kagami_prepare_camera_kernels
+''', KAGAMI_TEST_KERNELS="\n".join(kernels), KAGAMI_TEST_CALLS=str(calls),
+                                     KAGAMI_TEST_MISMATCH="1" if mismatch else "0")
+            self.assertEqual(result.returncode, 2 if mismatch else 0, result.stderr)
+            expected = []
+            for kernel in kernels[:2] if mismatch else kernels:
+                expected.extend([f"devel {kernel}", f"akmods --force --kernels {kernel} --akmod v4l2loopback"])
+            self.assertEqual(calls.read_text().splitlines(), expected)
+            if mismatch:
+                self.assertIn("does not match", result.stderr)
+
     def test_kernel_selection_prefers_running_kernel_with_matching_files(self):
         current, newer = "7.2.8-200.fc44.x86_64", "7.2.9-200.fc44.x86_64"
         result = select_kernel(current, [newer, current], [current, newer])

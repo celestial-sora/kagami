@@ -9,7 +9,7 @@ kagami_plan() {
     cat <<'PLAN'
 Kagami installer · Fedora Workstation (DNF, systemd)
   1. Install GTK/Rust/GStreamer and system Python dependencies with sudo.
-  2. Enable RPM Fusion Free if needed; install its v4l2loopback akmod.
+  2. Enable RPM Fusion Free; build v4l2loopback for installed Fedora kernels.
   3. Build Kagami as your ordinary user, using the selected Git ref.
   4. Preserve existing settings/CA, or create local HTTPS configuration.
   5. Install an application-menu launcher and a narrow camera setup service.
@@ -52,6 +52,60 @@ kagami_kernel_ready() {
         [[ -r /usr/src/kernels/$kernel/Makefile || -r /lib/modules/$kernel/build/Makefile ]]
 }
 
+kagami_installed_kernels() {
+    local kernel arch
+    arch=$(uname -m)
+    while IFS= read -r kernel; do
+        if [[ $kernel == *."$arch" ]]; then printf '%s\n' "$kernel"; fi
+    done < <(rpm -q --qf '%{VERSION}-%{RELEASE}.%{ARCH}\n' kernel-core 2>/dev/null | sort -Vu)
+}
+
+kagami_kernel_devel_url() {
+    local kernel=$1 version release arch signature key
+    # Only construct archive paths from an installed Fedora kernel's metadata.
+    [[ $kernel =~ ^([0-9][A-Za-z0-9._+~]*)-([A-Za-z0-9._+~]+\.fc[0-9]+)\.([A-Za-z0-9_]+)$ ]] || return 1
+    version=${BASH_REMATCH[1]}; release=${BASH_REMATCH[2]}; arch=${BASH_REMATCH[3]}
+    [[ $arch == "$(uname -m)" ]] || return 1
+    signature=$(LC_ALL=C rpm -q --qf '%{RSAHEADER:pgpsig}' "kernel-core-$kernel") || return 1
+    key=${signature##*Key ID }; key=${key,,}
+    [[ $key =~ ^[0-9a-f]{16}$ ]] || return 1
+    printf 'https://kojipkgs.fedoraproject.org/packages/kernel/%s/%s/data/signed/%s/%s/kernel-devel-%s.rpm\n' \
+        "$version" "$release" "${key: -8}" "$arch" "$kernel"
+}
+
+kagami_ensure_kernel_devel() {
+    local kernel=$1 url
+    kagami_kernel_ready "$kernel" && return 0
+    # Preserve all installed versions during these exact-devel transactions.
+    if sudo dnf install -y --setopt=installonly_limit=0 "kernel-devel-$kernel"; then
+        kagami_kernel_ready "$kernel" && return 0
+    fi
+    url=$(kagami_kernel_devel_url "$kernel") || return 1
+    kagami_log "Looking up signed Fedora development files for $kernel in Koji"
+    # Direct RPM URLs otherwise default to no signature check in DNF.
+    sudo dnf install -y --setopt=installonly_limit=0 --setopt=localpkg_gpgcheck=True "$url" || return 1
+    kagami_kernel_ready "$kernel"
+}
+
+kagami_prepare_camera_kernels() {
+    local kernel vermagic kernels=()
+    mapfile -t kernels < <(kagami_installed_kernels)
+    (( ${#kernels[@]} )) || { kagami_fail 'No installed Fedora kernel-core packages were found for this architecture.'; return 2; }
+    for kernel in "${kernels[@]}"; do
+        kagami_log "Preparing virtual camera driver for $kernel"
+        kagami_ensure_kernel_devel "$kernel" || {
+            kagami_fail "Matching signed development files for $kernel could not be installed. Review the DNF/Koji error above."; return 2;
+        }
+        sudo akmods --force --kernels "$kernel" --akmod v4l2loopback || {
+            kagami_fail "Virtual camera driver build failed for $kernel. See /var/cache/akmods/v4l2loopback/ for the build log."; return 2;
+        }
+        vermagic=$(modinfo -k "$kernel" -F vermagic v4l2loopback) || return 2
+        [[ $vermagic == "$kernel "* ]] || {
+            kagami_fail "Virtual camera module does not match $kernel."; return 2;
+        }
+    done
+}
+
 kagami_select_kernel() {
     local running=$1 candidate arch
     if kagami_kernel_ready "$running"; then
@@ -65,7 +119,7 @@ kagami_select_kernel() {
         if kagami_kernel_ready "$candidate"; then
             printf '%s\n' "$candidate"; return
         fi
-    done < <(rpm -q --qf '%{VERSION}-%{RELEASE}.%{ARCH}\n' kernel-core 2>/dev/null | sort -Vr)
+    done < <(kagami_installed_kernels | sort -Vr)
     return 1
 }
 
@@ -108,19 +162,6 @@ kagami_main() {
         python3 python3-gobject python3-gstreamer1 python3-aiohttp gstreamer1 gstreamer1-plugins-base \
         gstreamer1-plugins-good gstreamer1-plugins-bad-free libnice-gstreamer1 \
         openssl iproute v4l-utils akmods mokutil
-    if ! kernel=$(kagami_select_kernel "$running"); then
-        # Request only the running kernel's devel package; never update the kernel silently.
-        sudo dnf install -y "kernel-devel-$running" || {
-            kagami_fail "Development files for $running are unavailable and no newer installed kernel has matching files. Install a matching Fedora kernel/kernel-devel pair, reboot into it, then rerun this command."; return 2;
-        }
-        kernel=$(kagami_select_kernel "$running") || {
-            kagami_fail 'No installed Fedora kernel has a complete matching development tree.'; return 2;
-        }
-    fi
-    if [[ $kernel != "$running" ]]; then
-        pending=1; kernel_pending=1
-        kagami_log "Running $running; preparing the camera for installed kernel $kernel. Reboot into $kernel after installation."
-    fi
     if ! rpm -q rpmfusion-free-release >/dev/null 2>&1; then
         kagami_log 'Enabling RPM Fusion Free for the virtual camera driver'
         sudo dnf install -y "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm"
@@ -128,7 +169,15 @@ kagami_main() {
     # Keep an existing akmods key. Never replace it or disable Secure Boot.
     sudo kmodgenca -a
     sudo dnf install -y akmod-v4l2loopback v4l2loopback
-    sudo akmods --force --kernels "$kernel" --akmod v4l2loopback
+    kagami_prepare_camera_kernels || return 2
+    sudo systemctl enable akmods.service
+    kernel=$(kagami_select_kernel "$running") || {
+        kagami_fail 'No prepared installed Fedora kernel can run the camera.'; return 2;
+    }
+    if [[ $kernel != "$running" ]]; then
+        pending=1; kernel_pending=1
+        kagami_log "Running $running is not an installed supported Fedora kernel. Reboot into prepared kernel $kernel after installation."
+    fi
     if LC_ALL=C mokutil --sb-state 2>/dev/null | grep -q 'SecureBoot enabled'; then
         if ! sudo mokutil --test-key /etc/pki/akmods/certs/public_key.der >/dev/null 2>&1; then
             kagami_log 'Secure Boot needs the akmods signing key. Set an enrollment password now; after reboot choose Enroll MOK and enter that password.'
