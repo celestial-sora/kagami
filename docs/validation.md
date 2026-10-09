@@ -1,5 +1,25 @@
 # Validation record · 2026-10-09
 
+## Fedora desktop checks
+
+The CLI session now runs on the actual Fedora 44 Workstation desktop: GNOME/Wayland, GNOME Shell/Mutter 50.5, running kernel `7.2.8-200.fc44.x86_64`. Kernel `7.2.9-200.fc44.x86_64` and its matching `kernel-devel`/`kernel-devel-matched` are installed. Secure Boot is disabled. OBS Studio `32.1.1-3.fc44` is installed. Python is 3.14, PyGObject is 3.56.3, and GStreamer is 1.28.7.
+
+Two measured blockers were fixed on `fix/fedora-kernel-bootstrap`:
+
+- The original installer failed requesting unavailable development files for the running 7.2.8 kernel. Its new read-only selection correctly chooses the already installed 7.2.9 kernel with matching files. It stages the module/app setup and reports reboot pending (code 10), deferring camera loading and doctor until that kernel is running. Three additional inventory tests cover running-kernel preference, version ordering/incomplete development files, and rejecting older kernels, other architectures and development-only packages.
+- The original `G_DEBUG=fatal-criticals` media API check aborted at ICE teardown. In this PyGObject version, `ice._ref()` left the native count at one; dropping the Python wrapper freed ICE while webrtcbin still held its pointer. A guarded native `g_object_ref` restores the missing owner. The real check now reconfigures each agent twice, exercises both destruction orders and confirms the agent is released after both owners are gone.
+
+Passed locally on this Fedora machine:
+
+- 25 Python host/installer tests with system Python; Python compilation and shell syntax checks.
+- Seven Playwright/Chromium synthetic-camera scenarios and client JavaScript syntax checks. Playwright used its Ubuntu 24.04 fallback Chromium build on Fedora.
+- `cargo build --release -p kagami-linux`, linked against installed GTK 4.22.5/libadwaita 1.9.4.
+- ShellCheck 0.11.0 and Desktop Entry validation. ShellCheck was extracted from the Fedora RPM into a temporary user-owned directory without system installation.
+- GStreamer 1.28.7 plugins, bounded ICE properties and three clean receiver/ICE teardowns with fatal criticals enabled.
+- Installer dry run and read-only selection of the installed kernel/development pair.
+
+Still pending on this machine: full privileged installer execution (sudo requires the desktop user's password), building/loading v4l2loopback and boot-service/ACL/firewall verification. Only the physical UVC camera's video0/video1 devices exist; no Kagami loopback is installed. Native window operation/visual inspection, generated frames in OBS, physical Android CA trust/capture, phone-to-GStreamer/V4L2/OBS, reconnects, 15-minute measurements and USB remain unverified. These local automated checks do not close Phase 0.
+
 ## Verified in the authoring environment
 
 - Ubuntu 24.04 execution environment, Python 3.12, aiohttp 3.14.4, Node 24.
@@ -19,6 +39,8 @@
 - Browser cases now start from a fresh document; fragment-only navigation had previously preserved tracks from the prior test and produced a false failure.
 
 ## Not verified here
+
+This subsection describes the earlier Ubuntu authoring environment. The newer Fedora checks above supersede its dependency/build limitations, while the physical-device gate remains open.
 
 - Rust/GTK execution and native visual inspection on Fedora. Local compilation was unavailable, but the GitHub compile check above passed.
 - GStreamer decoding, GLib pipeline lifecycle, V4L2 writes and OBS integration: GStreamer/PyGObject and `/dev/video*` are absent.

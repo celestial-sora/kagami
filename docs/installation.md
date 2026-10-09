@@ -23,7 +23,15 @@ The host installer cannot grant Android certificate trust or camera permission o
 
 The installer preserves the existing akmods signing key, or creates one before building the camera module. When Secure Boot is enabled and this key is not enrolled, it requests an enrollment password using `mokutil`. Reboot, choose **Enroll MOK**, and confirm using that password. The camera setup service runs after reboot; no second installation command is required for that enrollment step.
 
-In this case it reports **camera setup pending** and exits with code 10 rather than claiming a ready camera. It never disables Secure Boot or certificate verification. Kernel/header mismatches, unsigned previously installed modules, package build errors or denied permissions report an actionable failure. See the distribution's `/usr/share/doc/akmods/README.secureboot` and [RPM Fusion guidance](https://rpmfusion.org/Howto/Secure%20Boot).
+In this case it reports **camera setup pending** and exits with code 10 rather than claiming a ready camera. It never disables Secure Boot or certificate verification. Unsigned previously installed modules, package build errors or denied permissions report an actionable failure. See the distribution's `/usr/share/doc/akmods/README.secureboot` and [RPM Fusion guidance](https://rpmfusion.org/Howto/Secure%20Boot).
+
+## Installed kernel awaiting reboot
+
+After a Fedora update, the running kernel can be older than the installed `kernel-devel` package, and repositories may no longer provide development files for that older kernel. The installer prefers the running kernel when its matching files exist. Otherwise it can build the camera module for the newest **already installed**, same-architecture kernel with a matching development tree.
+
+Installation then completes with **camera setup pending**, prints the exact kernel to boot, and exits with code **10**. Save your work and reboot into that kernel; the enabled camera service creates the device on boot, so you do not need to reinstall. If a boot menu appears, select the printed kernel. Secure Boot enrollment, when required, is reported separately and can be completed during the same reboot.
+
+The installer does not reboot, change your default boot entry, downgrade, or silently update the kernel. If neither the running kernel nor a newer installed kernel has matching development files, it attempts to install the running kernel's exact `kernel-devel` package. If that package is unavailable, install a matching Fedora kernel/development pair, reboot into it, and rerun the installer.
 
 ## Updates and paths
 
