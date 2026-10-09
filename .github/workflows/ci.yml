@@ -21,8 +21,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.0.0
         with:
           python-version: '3.12'
       - run: python -m pip install -r apps/host/requirements.txt
@@ -37,8 +37,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
         with:
           node-version: '24'
       - run: npm install
@@ -49,7 +49,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
       - run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libadwaita-1-dev pkg-config shellcheck desktop-file-utils
       - run: shellcheck install.sh packaging/fedora/kagami-camera-setup tools/test-pattern.sh
       - run: |
@@ -61,9 +61,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
       - run: |
           sudo apt-get update
-          sudo apt-get install -y python3-gi gir1.2-gst-plugins-bad-1.0 gstreamer1.0-tools \
+          sudo apt-get install -y python3-gi python3-gst-1.0 gir1.2-gst-plugins-bad-1.0 gstreamer1.0-tools \
             gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-nice
-      - run: PYTHONPATH=apps/host /usr/bin/python3 tools/check_media_runtime.py
+      - run: G_DEBUG=fatal-criticals PYTHONPATH=apps/host /usr/bin/python3 tools/check_media_runtime.py

@@ -7,7 +7,7 @@ For automated setup use the [one-command installer](installation.md).
 ## Userspace packages
 
 ```bash
-sudo dnf install python3-gobject python3-aiohttp gstreamer1 \
+sudo dnf install python3-gobject python3-gstreamer1 python3-aiohttp gstreamer1 \
   gstreamer1-plugins-base gstreamer1-plugins-good gstreamer1-plugins-bad-free \
   libnice-gstreamer1 openssl
 ```
@@ -22,7 +22,7 @@ Use the system Python so it can import the distribution's PyGObject. A separatel
 
 ## Virtual camera driver
 
-Install a distribution-appropriate `v4l2loopback` module for the running kernel. Check your enabled repositories and Secure Boot signing requirements; Kagami does not install repositories, rebuild kernels, or disable Secure Boot automatically. See [upstream setup](https://github.com/v4l2loopback/v4l2loopback#installation).
+For manual setup, install a distribution-appropriate `v4l2loopback` module for the running kernel and check its Secure Boot signing requirements. The [automated installer](installation.md) can enable RPM Fusion Free and build its camera module; the runtime host stays unprivileged. See [upstream setup](https://github.com/v4l2loopback/v4l2loopback#installation).
 
 After the module is installed, pick an unused device number. For example, after checking that `/dev/video10` is free:
 

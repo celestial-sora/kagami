@@ -80,7 +80,7 @@ kagami_main() {
     kernel=$(uname -r)
     kagami_log 'Installing build and media dependencies'
     sudo dnf install -y git rust cargo gcc pkgconf-pkg-config gtk4-devel libadwaita-devel \
-        python3 python3-gobject python3-aiohttp gstreamer1 gstreamer1-plugins-base \
+        python3 python3-gobject python3-gstreamer1 python3-aiohttp gstreamer1 gstreamer1-plugins-base \
         gstreamer1-plugins-good gstreamer1-plugins-bad-free libnice-gstreamer1 \
         openssl iproute v4l-utils akmods mokutil
     # Only this running kernel is requested; do not update/reboot it silently.
