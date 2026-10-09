@@ -103,7 +103,8 @@ fn build(app: &adw::Application, root: PathBuf) {
     let subtitle = gtk::Label::new(Some("Your phone. Your point of view."));
     subtitle.add_css_class("dim-label");
     body.append(&subtitle);
-    let config = gtk::Entry::builder().text("config.json").placeholder_text("Configuration file").build();
+    let config_path = std::env::var("KAGAMI_CONFIG").unwrap_or_else(|_| "config.json".into());
+    let config = gtk::Entry::builder().text(config_path.as_str()).placeholder_text("Configuration file").build();
     body.append(&gtk::Label::new(Some("Host configuration")));
     body.append(&config);
     let status = gtk::Label::new(Some("Host stopped"));

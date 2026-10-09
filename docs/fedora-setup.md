@@ -2,10 +2,12 @@
 
 These are reproducible setup instructions for the target machine, not a claim that this execution environment is Fedora or has tested the driver.
 
+For automated setup use the [one-command installer](installation.md).
+
 ## Userspace packages
 
 ```bash
-sudo dnf install python3-gobject python3-aiohttp gstreamer1 \
+sudo dnf install python3-gobject python3-gstreamer1 python3-aiohttp gstreamer1 \
   gstreamer1-plugins-base gstreamer1-plugins-good gstreamer1-plugins-bad-free \
   libnice-gstreamer1 openssl
 ```
@@ -20,7 +22,7 @@ Use the system Python so it can import the distribution's PyGObject. A separatel
 
 ## Virtual camera driver
 
-Install a distribution-appropriate `v4l2loopback` module for the running kernel. Check your enabled repositories and Secure Boot signing requirements; Kagami does not install repositories, rebuild kernels, or disable Secure Boot automatically. See [upstream setup](https://github.com/v4l2loopback/v4l2loopback#installation).
+For manual setup, install a distribution-appropriate `v4l2loopback` module for the running kernel and check its Secure Boot signing requirements. The [automated installer](installation.md) can enable RPM Fusion Free and build its camera module; the runtime host stays unprivileged. See [upstream setup](https://github.com/v4l2loopback/v4l2loopback#installation).
 
 After the module is installed, pick an unused device number. For example, after checking that `/dev/video10` is free:
 
@@ -45,6 +47,6 @@ With `exclusive_caps=1`, camera consumers may discover the device only after a p
 
 ## Network and firewall
 
-Set `config.json` to the actual reachable IPv4 address of the chosen interface. The server binds that address only. Allow HTTPS TCP on the configured port plus the local WebRTC UDP traffic on that interface/subnet. Do not open an Internet-facing forwarding rule. The spike does not yet configure a restricted ICE UDP port range; keep firewall changes scoped to the trusted local link and record the policy used in the acceptance report.
+Set `config.json` to the actual reachable IPv4 address of the chosen interface. The server binds that address only. Allow HTTPS TCP on the configured port plus the configured ICE UDP range (default 50000–50100) on that interface/subnet. Keep changes scoped to the trusted local link and record the policy used in acceptance. The installer uses source-subnet/destination-IP rules and does not enable Internet port forwarding.
 
 Package references: [libnice-gstreamer1](https://packages.fedoraproject.org/pkgs/libnice/libnice-gstreamer1/), [GStreamer bad-free plugins](https://packages.fedoraproject.org/pkgs/gstreamer1-plugins-bad-free/gstreamer1-plugins-bad-free/).

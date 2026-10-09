@@ -6,6 +6,7 @@
 - 15 Python auth/protocol/TLS integration tests passed.
 - Browser client and browser-test JavaScript syntax checks passed.
 - Read-only doctor exits with an actionable missing-dependency/device report instead of starting a fake camera.
+- One-command installer batch: 22 Python tests passed locally, including seven installer/configuration scenarios. They exercise actual local TLS generation and preservation, interface selection, literal launcher paths, a no-change piped dry run and invalid privileged-helper input. They do not run DNF, systemd, firewalld or kernel installation.
 
 ## GitHub CI evidence
 
@@ -21,7 +22,10 @@
 - Physical browser behavior beyond the explicitly recorded Chromium synthetic-camera checks. Chromium is absent from the authoring environment; browser execution occurs in CI.
 - Physical Android browser HTTPS/CA onboarding, actual front/rear switching, Wi-Fi/USB paths, capture behavior and latency.
 - Fedora installation, kernel module/Secure Boot setup, native visual inspection and hardware acceleration.
+- Fresh-Fedora execution of the complete curl installer, akmods/MOK enrollment, uaccess and firewalld behavior. These remain machine-dependent acceptance checks.
 
 The GitHub workflow provides Python, browser and native-build checks. Workflow configuration alone is not evidence of passing checks; inspect the recorded run results.
+
+The installer batch adds ShellCheck, Desktop Entry validation, a native release build and real GStreamer plugin/ICE API checks to CI. These checks do not prove a moving phone image reaches a V4L2 device or OBS.
 
 **Phase 0 hardware acceptance remains open.** Focus, Android screen capture and final packaging were deliberately not advanced before that gate.

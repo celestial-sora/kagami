@@ -2,26 +2,43 @@ name: Checks
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - 'README.md'
+      - 'AGENTS.md'
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - 'README.md'
+      - 'AGENTS.md'
 permissions:
   contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
   host:
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.0.0
         with:
           python-version: '3.12'
       - run: python -m pip install -r apps/host/requirements.txt
       - run: python -m unittest discover -s tests -v
       - run: python -m compileall -q apps/host tools
       - run: bash -n tools/test-pattern.sh
+      - run: |
+          for script in install.sh packaging/fedora/kagami-camera-setup; do
+            bash -n "$script"
+          done
   browser:
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
         with:
           node-version: '24'
       - run: npm install
@@ -30,8 +47,23 @@ jobs:
       - run: npm run test:browser
   native:
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libadwaita-1-dev pkg-config
+      - uses: actions/checkout@v7.0.1
+      - run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libadwaita-1-dev pkg-config shellcheck desktop-file-utils
+      - run: shellcheck install.sh packaging/fedora/kagami-camera-setup tools/test-pattern.sh
+      - run: |
+          python3 tools/install_launchers.py --root /tmp/kagami --config /tmp/kagami/config.json --data /tmp/kagami-desktop
+          desktop-file-validate /tmp/kagami-desktop/applications/io.kagami.Host.desktop
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo check --workspace
+      - run: cargo build --release -p kagami-linux
+  media-api:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-gi python3-gst-1.0 gir1.2-gst-plugins-bad-1.0 gstreamer1.0-tools \
+            gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-nice
+      - run: G_DEBUG=fatal-criticals PYTHONPATH=apps/host /usr/bin/python3 tools/check_media_runtime.py

@@ -17,6 +17,8 @@ class Config:
     width: int = 1280
     height: int = 720
     fps: int = 30
+    udp_port_min: int = 50000
+    udp_port_max: int = 50100
 
     @property
     def origin(self) -> str:
@@ -31,7 +33,7 @@ class Config:
 def load_config(path: Path) -> Config:
     path = path.resolve()
     values = json.loads(path.read_text(encoding="utf-8"))
-    allowed = {"host", "port", "device", "certificate", "private_key", "width", "height", "fps"}
+    allowed = {"host", "port", "device", "certificate", "private_key", "width", "height", "fps", "udp_port_min", "udp_port_max"}
     if not isinstance(values, dict) or set(values) - allowed:
         raise ValueError("Configuration must be an object with documented fields only.")
     host = values.get("host", "127.0.0.1")
@@ -50,9 +52,12 @@ def load_config(path: Path) -> Config:
     if any(type(v) is not int for v in (width, height, fps)) or (width, height) not in ((1280, 720), (1920, 1080)) or fps not in (15, 30):
         raise ValueError("Use 1280x720 or 1920x1080, with 15 or 30 FPS.")
     paths = []
+    udp_min, udp_max = values.get("udp_port_min", 50000), values.get("udp_port_max", 50100)
+    if any(type(v) is not int for v in (udp_min, udp_max)) or not 1024 <= udp_min <= udp_max <= 65535:
+        raise ValueError("ICE UDP ports must form an ordered range between 1024 and 65535.")
     for field in ("certificate", "private_key"):
         value = values.get(field)
         if not isinstance(value, str) or not value:
             raise ValueError(f"{field} must name a TLS file.")
         paths.append((path.parent / value).resolve())
-    return Config(str(address), port, device, *paths, width, height, fps)
+    return Config(str(address), port, device, *paths, width, height, fps, udp_min, udp_max)

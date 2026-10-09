@@ -33,6 +33,19 @@ def gst_modules():
     return GLib, Gst, GstSdp, GstWebRTC
 
 
+def configure_ice_ports(receiver, minimum, maximum):
+    ice = receiver.get_property("ice-agent")
+    # webrtcbin constructs a floating ICE object. Some GI versions consume
+    # its sole reference while wrapping this property, leaving two owners
+    # with one reference. Restore webrtcbin's ownership only in that case.
+    # An already-sunk/fixed binding reports both references and needs no fix.
+    if ice.__grefcount__ == 1:
+        ice._ref()
+    ice.set_property("min-rtp-port", minimum)
+    ice.set_property("max-rtp-port", maximum)
+    return ice
+
+
 class GstReceiver:
     def __init__(self, config, emit):
         self.config, self.emit = config, emit
@@ -141,6 +154,7 @@ class GstReceiver:
         self.webrtc = Gst.ElementFactory.make("webrtcbin", "phone-receiver")
         self.webrtc.set_property("bundle-policy", self.WebRTC.WebRTCBundlePolicy.MAX_BUNDLE)
         self.webrtc.set_property("latency", 60)
+        configure_ice_ports(self.webrtc, self.config.udp_port_min, self.config.udp_port_max)
         # No STUN/TURN server is configured. All media stays on the local link.
         self.webrtc.connect("on-ice-candidate", self._on_ice, self.generation)
         self.webrtc.connect("pad-added", self._on_pad, self.generation)

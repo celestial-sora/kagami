@@ -1,0 +1,1 @@
+SUBSYSTEM=="video4linux", ATTR{name}=="Kagami Virtual Camera", TAG+="uaccess"
