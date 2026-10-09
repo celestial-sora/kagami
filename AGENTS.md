@@ -1,5 +1,6 @@
 # Kagami engineering context
 
+- For a new engineering session, read docs/handoff.md alongside the implementation plan and current validation record; the handoff is a dated snapshot, not a substitute for fetching the latest code.
 - Linux hosts the local service; the phone sends video. OBS consumes a genuine V4L2 device named Kagami Virtual Camera.
 - Work order follows docs/implementation-plan.md. Phase 0 hardware acceptance has not passed. Do not label this a working release until Fedora, Android and OBS are actually tested.
 - Python/PyGObject is the Phase 0 reference integration; the native shell is Rust + GTK4/libadwaita. Migrate media into Rust only after validating the existing pipeline.
