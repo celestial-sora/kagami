@@ -25,13 +25,17 @@ The installer preserves the existing akmods signing key, or creates one before b
 
 In this case it reports **camera setup pending** and exits with code 10 rather than claiming a ready camera. It never disables Secure Boot or certificate verification. Unsigned previously installed modules, package build errors or denied permissions report an actionable failure. See the distribution's `/usr/share/doc/akmods/README.secureboot` and [RPM Fusion guidance](https://rpmfusion.org/Howto/Secure%20Boot).
 
-## Installed kernel awaiting reboot
+## Multiple kernel versions
 
-After a Fedora update, the running kernel can be older than the installed `kernel-devel` package, and repositories may no longer provide development files for that older kernel. The installer prefers the running kernel when its matching files exist. Otherwise it can build the camera module for the newest **already installed**, same-architecture kernel with a matching development tree.
+The virtual camera driver is compiled separately for each installed Fedora `kernel-core` version of the host architecture. The installer obtains that kernel's exact `kernel-devel` package, builds its v4l2loopback module through RPM Fusion akmods, and verifies the module's `vermagic` matches the requested kernel. Kagami's application/configuration can be reused when switching between those kernels.
 
-Installation then completes with **camera setup pending**, prints the exact kernel to boot, and exits with code **10**. Save your work and reboot into that kernel; the enabled camera service creates the device on boot, so you do not need to reinstall. If a boot menu appears, select the printed kernel. Secure Boot enrollment, when required, is reported separately and can be completed during the same reboot.
+Fedora repositories often retain only the latest kernel development packages. If an installed older version is unavailable there, the installer tries the **signed Fedora Koji archive**, using the version, release, architecture and signing key of that installed kernel. DNF signature checking is explicitly enabled for this direct RPM URL. If signed development files or a compatible driver cannot be prepared for a kernel, installation reports that exact kernel and fails visibly.
 
-The installer does not reboot, change your default boot entry, downgrade, or silently update the kernel. If neither the running kernel nor a newer installed kernel has matching development files, it attempts to install the running kernel's exact `kernel-devel` package. If that package is unavailable, install a matching Fedora kernel/development pair, reboot into it, and rerun the installer.
+Exact development-package transactions preserve installed versions without changing your global DNF settings. The installer keeps boot defaults and existing kernels, and starts the camera on the running kernel once its module is prepared. A reboot is still needed for pending Secure Boot enrollment, or when the running kernel is outside the installed standard Fedora kernel inventory; those cases print the required action and exit with code **10**.
+
+For subsequent kernel updates, RPM Fusion's existing `95-akmodsposttrans.install` hook invokes `akmods@<kernel>.service`. Its package dependencies provide matching development files, and the enabled `akmods.service` can build at boot before Kagami's camera service starts. No extra Kagami download/build daemon is added. Keep the kernel/development packages together when updating; Internet is needed for package installation, while an already prepared camera stays local at runtime.
+
+Automatic preparation covers standard Fedora `kernel-core` packages. Custom/debug/real-time kernels require their own matching development packages and driver setup. The driver must support the kernel API; a successful source test or build for one version does not prove compatibility with every future kernel.
 
 ## Updates and paths
 
