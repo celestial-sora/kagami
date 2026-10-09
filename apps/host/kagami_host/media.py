@@ -141,6 +141,9 @@ class GstReceiver:
         self.webrtc = Gst.ElementFactory.make("webrtcbin", "phone-receiver")
         self.webrtc.set_property("bundle-policy", self.WebRTC.WebRTCBundlePolicy.MAX_BUNDLE)
         self.webrtc.set_property("latency", 60)
+        ice = self.webrtc.get_property("ice-agent")
+        ice.set_property("min-rtp-port", self.config.udp_port_min)
+        ice.set_property("max-rtp-port", self.config.udp_port_max)
         # No STUN/TURN server is configured. All media stays on the local link.
         self.webrtc.connect("on-ice-candidate", self._on_ice, self.generation)
         self.webrtc.connect("pad-added", self._on_pad, self.generation)

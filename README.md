@@ -4,7 +4,15 @@ A local phone camera bridge for Linux. Your phone sends video; your computer exp
 
 **Current state: Phase 0 source prototype, hardware acceptance pending.** The HTTPS/pairing service has automated tests. The GStreamer receiver and native Rust shell require the checks below on a Linux machine. This is not a completed v0.1 release.
 
-## Start on Fedora
+## Install on Fedora
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/celestial-sora/kagami/main/install.sh | bash
+```
+
+Run as your desktop user. The installer handles dependencies, virtual-camera setup, native build, configuration, TLS and an application-menu launcher. See [installation](docs/installation.md) for Secure Boot enrollment, updates and exact scope. Android certificate trust and camera permission remain first-time phone actions.
+
+## Manual developer setup
 
 Follow [Fedora setup](docs/fedora-setup.md) for system packages and the one-time virtual camera setup. Then:
 

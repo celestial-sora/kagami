@@ -73,7 +73,9 @@ class SessionTests(unittest.TestCase):
             path = Path(directory) / "config.json"
             base = json.loads((ROOT / "config.example.json").read_text())
             for update in ({"host": "0.0.0.0"}, {"host": "8.8.8.8"}, {"device": "/tmp/output"},
-                           {"fps": True}, {"port": "8443"}, {"width": 4}):
+                           {"fps": True}, {"port": "8443"}, {"width": 4},
+                           {"udp_port_min": 50101, "udp_port_max": 50100},
+                           {"udp_port_min": True}, {"udp_port_max": 70000}):
                 path.write_text(json.dumps({**base, **update}))
                 with self.subTest(update=update), self.assertRaises(ValueError):
                     load_config(path)
@@ -244,12 +246,14 @@ class HttpsHostTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_only_client_assets_are_served(self):
         for path in ("/config.json", "/.local/tls/server.key", "/ca.key", "/docs/security.md"):
-            response = await self.client.get(self.origin + path)
-            self.assertEqual(response.status, 404)
-        response = await self.client.get(self.origin + "/")
-        self.assertEqual(response.status, 200)
-        self.assertEqual(response.headers["Referrer-Policy"], "no-referrer")
-        self.assertIn("frame-ancestors 'none'", response.headers["Content-Security-Policy"])
+            async with self.client.get(self.origin + path) as response:
+                self.assertEqual(response.status, 404)
+                await response.read()
+        async with self.client.get(self.origin + "/") as response:
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.headers["Referrer-Policy"], "no-referrer")
+            self.assertIn("frame-ancestors 'none'", response.headers["Content-Security-Policy"])
+            await response.read()
 
     async def test_certificate_generation_preserves_existing_identity(self):
         before = (self.tls / "ca.pem").read_bytes()

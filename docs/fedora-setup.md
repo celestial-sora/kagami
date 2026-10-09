@@ -2,6 +2,8 @@
 
 These are reproducible setup instructions for the target machine, not a claim that this execution environment is Fedora or has tested the driver.
 
+For automated setup use the [one-command installer](installation.md).
+
 ## Userspace packages
 
 ```bash
@@ -45,6 +47,6 @@ With `exclusive_caps=1`, camera consumers may discover the device only after a p
 
 ## Network and firewall
 
-Set `config.json` to the actual reachable IPv4 address of the chosen interface. The server binds that address only. Allow HTTPS TCP on the configured port plus the local WebRTC UDP traffic on that interface/subnet. Do not open an Internet-facing forwarding rule. The spike does not yet configure a restricted ICE UDP port range; keep firewall changes scoped to the trusted local link and record the policy used in the acceptance report.
+Set `config.json` to the actual reachable IPv4 address of the chosen interface. The server binds that address only. Allow HTTPS TCP on the configured port plus the configured ICE UDP range (default 50000–50100) on that interface/subnet. Keep changes scoped to the trusted local link and record the policy used in acceptance. The installer uses source-subnet/destination-IP rules and does not enable Internet port forwarding.
 
 Package references: [libnice-gstreamer1](https://packages.fedoraproject.org/pkgs/libnice/libnice-gstreamer1/), [GStreamer bad-free plugins](https://packages.fedoraproject.org/pkgs/gstreamer1-plugins-bad-free/gstreamer1-plugins-bad-free/).

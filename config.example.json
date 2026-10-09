@@ -6,5 +6,7 @@
   "private_key": ".local/tls/server.key",
   "width": 1280,
   "height": 720,
-  "fps": 30
+  "fps": 30,
+  "udp_port_min": 50000,
+  "udp_port_max": 50100
 }
