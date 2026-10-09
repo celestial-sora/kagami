@@ -111,7 +111,18 @@ const ended = () => page.waitForFunction(() => window.__tracks.every((track) => 
 let passed = 0;
 async function test(name, run) {
   await ready();
-  await run();
+  try {
+    await run();
+  } catch (error) {
+    console.error('Browser failure diagnostics', await page.evaluate(() => ({
+      state: document.querySelector('#state').textContent,
+      message: document.querySelector('#message').textContent,
+      source: document.querySelector('#source-label').textContent,
+      tracks: window.__tracks.map((track) => ({ state: track.readyState, settings: track.getSettings() })),
+      peers: window.__peers.map((peer) => ({ connection: peer.connectionState, ice: peer.iceConnectionState, signaling: peer.signalingState })),
+    })), failures);
+    throw error;
+  }
   passed += 1;
   console.log(`PASS ${name}`);
 }
