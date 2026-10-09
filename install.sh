@@ -14,7 +14,7 @@ Kagami installer · Fedora Workstation (DNF, systemd)
   4. Preserve existing settings/CA, or create local HTTPS configuration.
   5. Install an application-menu launcher and a narrow camera setup service.
   6. Allow HTTPS + bounded ICE UDP only from the selected local subnet.
-Secure Boot may require password entry and one reboot to enroll a signing key.
+A newer installed kernel or Secure Boot key enrollment may require one reboot.
 Phone certificate trust and camera permission still need your first-time action.
 --dry-run prints this plan without installing, downloading, or changing files.
 PLAN
@@ -45,6 +45,30 @@ PY
     kagami_fail 'No free virtual camera slot between video10 and video63.'
 }
 
+kagami_kernel_ready() {
+    local kernel=$1
+    rpm -q "kernel-core-$kernel" "kernel-devel-$kernel" >/dev/null 2>&1 &&
+        [[ -r /boot/vmlinuz-$kernel && -d /lib/modules/$kernel ]] &&
+        [[ -r /usr/src/kernels/$kernel/Makefile || -r /lib/modules/$kernel/build/Makefile ]]
+}
+
+kagami_select_kernel() {
+    local running=$1 candidate arch
+    if kagami_kernel_ready "$running"; then
+        printf '%s\n' "$running"; return
+    fi
+    arch=$(uname -m)
+    while IFS= read -r candidate; do
+        [[ $candidate == *."$arch" && $candidate != "$running" ]] || continue
+        # Only stage a newer installed kernel; never downgrade or change boot settings.
+        [[ $(printf '%s\n' "$running" "$candidate" | sort -V | tail -n 1) == "$candidate" ]] || continue
+        if kagami_kernel_ready "$candidate"; then
+            printf '%s\n' "$candidate"; return
+        fi
+    done < <(rpm -q --qf '%{VERSION}-%{RELEASE}.%{ARCH}\n' kernel-core 2>/dev/null | sort -Vr)
+    return 1
+}
+
 kagami_main() {
     case ${1:-} in
         --help|--dry-run) kagami_plan; return 0 ;;
@@ -67,7 +91,8 @@ kagami_main() {
     [[ $ref =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ && $ref != *..* ]] || { kagami_fail 'Invalid KAGAMI_REF.'; return 2; }
     local data=${XDG_DATA_HOME:-$HOME/.local/share} config=${XDG_CONFIG_HOME:-$HOME/.config}/kagami
     [[ $data == /* && $config == /* ]] || { kagami_fail 'XDG paths must be absolute.'; return 2; }
-    local root=$data/kagami stage source kernel sha number network payload version pending=0
+    local root=$data/kagami stage source running kernel sha number network payload version
+    local pending=0 kernel_pending=0 mok_pending=0
     mkdir -p "$root"
     exec 9> "$root/install.lock"
     flock -n 9 || { kagami_fail 'Another Kagami installation is already running.'; return 2; }
@@ -77,16 +102,25 @@ kagami_main() {
     trap 'rm -rf -- "$KAGAMI_INSTALL_TEMP"' EXIT
     kagami_plan
     sudo -v
-    kernel=$(uname -r)
+    running=$(uname -r)
     kagami_log 'Installing build and media dependencies'
     sudo dnf install -y git rust cargo gcc pkgconf-pkg-config gtk4-devel libadwaita-devel \
         python3 python3-gobject python3-gstreamer1 python3-aiohttp gstreamer1 gstreamer1-plugins-base \
         gstreamer1-plugins-good gstreamer1-plugins-bad-free libnice-gstreamer1 \
         openssl iproute v4l-utils akmods mokutil
-    # Only this running kernel is requested; do not update/reboot it silently.
-    sudo dnf install -y "kernel-devel-$kernel" || {
-        kagami_fail "Development headers for $kernel are unavailable. Update/reboot Fedora to an installed supported kernel, then rerun this same command."; return 2;
-    }
+    if ! kernel=$(kagami_select_kernel "$running"); then
+        # Request only the running kernel's devel package; never update the kernel silently.
+        sudo dnf install -y "kernel-devel-$running" || {
+            kagami_fail "Development files for $running are unavailable and no newer installed kernel has matching files. Install a matching Fedora kernel/kernel-devel pair, reboot into it, then rerun this command."; return 2;
+        }
+        kernel=$(kagami_select_kernel "$running") || {
+            kagami_fail 'No installed Fedora kernel has a complete matching development tree.'; return 2;
+        }
+    fi
+    if [[ $kernel != "$running" ]]; then
+        pending=1; kernel_pending=1
+        kagami_log "Running $running; preparing the camera for installed kernel $kernel. Reboot into $kernel after installation."
+    fi
     if ! rpm -q rpmfusion-free-release >/dev/null 2>&1; then
         kagami_log 'Enabling RPM Fusion Free for the virtual camera driver'
         sudo dnf install -y "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm"
@@ -102,7 +136,7 @@ kagami_main() {
                 # The desktop user opens their own terminal; stdin is the curl pipe.
                 # shellcheck disable=SC2024
                 sudo mokutil --import /etc/pki/akmods/certs/public_key.der < /dev/tty
-                pending=1
+                pending=1; mok_pending=1
             else
                 kagami_fail 'Run from an interactive terminal to enroll the Secure Boot key.'; return 2
             fi
@@ -188,7 +222,12 @@ PY
     printf 'Phone trust certificate: %s/tls/ca.pem\n' "$config"
     printf 'Transfer only ca.pem to your phone and complete its one-time certificate trust setup.\n'
     if (( pending )); then
-        printf 'Camera setup pending: reboot, confirm Enroll MOK, then open Kagami.\n'
+        if (( kernel_pending )); then
+            printf 'Camera setup pending: reboot into %s, then open Kagami. The boot service will create the camera; no reinstall is needed.\n' "$kernel"
+        fi
+        if (( mok_pending )); then
+            printf 'Secure Boot setup pending: on reboot, confirm Enroll MOK with your enrollment password.\n'
+        fi
         return 10
     fi
     PYTHONPATH="$version/apps/host" python3 -m kagami_host doctor --config "$config/config.json" || {

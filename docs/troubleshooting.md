@@ -8,6 +8,7 @@
 | Import of `gi` fails | Use the distribution's system Python with PyGObject installed; run doctor in that same interpreter. |
 | Missing `webrtcbin` or `nicesrc` | Install GStreamer bad-free and libnice GStreamer plugins, then run doctor. |
 | No `/dev/video10` | Install/load the matching v4l2loopback kernel module and check Secure Boot/module signing. |
+| Installer reports camera setup pending after a kernel update | Reboot into the exact installed kernel printed by the installer. Its camera module is prepared; the boot service creates the device. Exit code 10 means reboot/enrollment remains pending. |
 | V4L2 identity rejected | Choose the actual loopback device labeled Kagami, not a physical camera. |
 | OBS cannot see camera | Start a producer first when using exclusive caps; refresh OBS's device list and check sandbox device access if OBS is packaged in Flatpak. |
 | Permission denied writing camera | Configure normal user device access through Fedora's ACL/group policy. Do not run the UI as root. |

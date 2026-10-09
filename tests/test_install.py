@@ -18,7 +18,42 @@ def interface(name, host, prefix=24):
     return {"ifname": name, "addr_info": [{"family": "inet", "scope": "global", "local": host, "prefixlen": prefix}]}
 
 
+def select_kernel(running, installed, ready):
+    # Simulate RPM inventory/readiness without touching packages or /boot.
+    env = {**os.environ, "KAGAMI_TEST_INSTALLED": "\n".join(installed),
+           "KAGAMI_TEST_READY": ":".join(ready)}
+    return subprocess.run(["bash", "-c", '''
+source "$1"
+rpm() { printf '%s\\n' "$KAGAMI_TEST_INSTALLED"; }
+uname() { printf 'x86_64\\n'; }
+kagami_kernel_ready() { [[ :$KAGAMI_TEST_READY: == *":$1:"* ]]; }
+kagami_select_kernel "$2"
+''', "kernel-test", str(ROOT / "install.sh"), running],
+                          env=env, capture_output=True, text=True)
+
+
 class InstallerTests(unittest.TestCase):
+    def test_kernel_selection_prefers_running_kernel_with_matching_files(self):
+        current, newer = "7.2.8-200.fc44.x86_64", "7.2.9-200.fc44.x86_64"
+        result = select_kernel(current, [newer, current], [current, newer])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), current)
+
+    def test_kernel_selection_stages_newest_complete_installed_kernel(self):
+        current = "7.2.8-200.fc44.x86_64"
+        installed = ["7.2.9-200.fc44.x86_64", current, "7.2.11-200.fc44.x86_64",
+                     "7.2.10-200.fc44.x86_64"]
+        result = select_kernel(current, installed, [installed[0], installed[3]])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), installed[3])
+
+    def test_kernel_selection_rejects_downgrades_other_arches_and_devel_only(self):
+        current = "7.2.8-200.fc44.x86_64"
+        installed = ["7.2.7-200.fc44.x86_64", "7.2.9-200.fc44.aarch64", current]
+        result = select_kernel(current, installed, installed[:2] + ["7.2.10-200.fc44.x86_64"])
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertEqual(result.stdout, "")
+
     def test_selects_default_lan_and_ignores_vpn_container_and_public_addresses(self):
         links = [interface("docker0", "172.17.0.1", 16), interface("wg0", "10.1.0.2"),
                  interface("enp1s0", "8.8.8.8"), interface("wlan0", "192.168.5.8"),
