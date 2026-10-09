@@ -10,6 +10,7 @@
 
 ## GitHub CI evidence
 
+- [Fedora kernel staging and modern PyGObject compatibility at `fb7727d`](https://github.com/celestial-sora/kagami/actions/runs/37946639315): all four PR #3 jobs passed. This includes 25 Python tests, seven Chromium scenarios, native release build/link, ShellCheck/Desktop Entry validation, and real GStreamer ICE checks covering repeated configuration and both teardown orders. This CI run uses Ubuntu 24.04; the Fedora results above were collected locally.
 - [Installer and Actions checks at `4d0f222`](https://github.com/celestial-sora/kagami/actions/runs/37940612911): all four jobs passed. This includes 22 Python tests, 7 Chromium scenarios, ShellCheck, Desktop Entry validation, and an actual native release build/link on Ubuntu 24.04.
 - GStreamer 1.24.2 found every required plugin, applied the ICE port limits, and freed the ICE agent after each of three receiver teardowns. `G_DEBUG=fatal-criticals` makes GLib critical messages fail the check. This checks real bindings/lifecycle, not negotiated phone media or V4L2 output.
 - [Source checks at `0b5b52e`](https://github.com/celestial-sora/kagami/actions/runs/37935062062): all 15 host tests and 7 Chromium scenarios passed on Ubuntu 24.04.
