@@ -60,7 +60,7 @@ Phase 0 uses Python/PyGObject to expose the media spike while the native shell i
 
 The current video codec is **VP8 only** for a small reproducible baseline. H.264/hardware acceleration, Kagami Focus, Android MediaProjection, audio, iOS, RPM/AppImage packaging and automatic certificate renewal remain later milestones. Android sources have not been fabricated before the Phase 0 gate passes.
 
-The native shell passes its GTK compile check in CI, and the phone client passes seven Chromium scenarios using a synthetic camera. Actual Fedora/Android/GStreamer/V4L2/OBS operation remains unverified. Consult [validation status](docs/validation.md) for exact evidence and limitations.
+CI passes 22 Python host/installer tests, seven Chromium synthetic-camera scenarios, a native release build, and real GStreamer plugin/ICE API and teardown checks. Actual Fedora installation and the Android → GStreamer → V4L2 → OBS streaming path remain unverified. Consult [validation status](docs/validation.md) for exact evidence and limitations.
 
 ## Developer checks
 

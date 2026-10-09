@@ -10,6 +10,8 @@
 
 ## GitHub CI evidence
 
+- [Installer and Actions checks at `4d0f222`](https://github.com/celestial-sora/kagami/actions/runs/37940612911): all four jobs passed. This includes 22 Python tests, 7 Chromium scenarios, ShellCheck, Desktop Entry validation, and an actual native release build/link on Ubuntu 24.04.
+- GStreamer 1.24.2 found every required plugin, applied the ICE port limits, and freed the ICE agent after each of three receiver teardowns. `G_DEBUG=fatal-criticals` makes GLib critical messages fail the check. This checks real bindings/lifecycle, not negotiated phone media or V4L2 output.
 - [Source checks at `0b5b52e`](https://github.com/celestial-sora/kagami/actions/runs/37935062062): all 15 host tests and 7 Chromium scenarios passed on Ubuntu 24.04.
 - Chromium exercised responsive layout, a real VP8 synthetic-camera exchange, camera switching, permission denial, cancellation during pending permission, protocol mismatch and host disconnect. The receiver is a browser-local WebRTC fixture, not GStreamer.
 - [Initial source checks at `1e443a4`](https://github.com/celestial-sora/kagami/actions/runs/37934155382): `cargo check --workspace` passed with GTK4/libadwaita development libraries. This checks compilation, not native window operation.
@@ -26,6 +28,6 @@
 
 The GitHub workflow provides Python, browser and native-build checks. Workflow configuration alone is not evidence of passing checks; inspect the recorded run results.
 
-The installer batch adds ShellCheck, Desktop Entry validation, a native release build and real GStreamer plugin/ICE API checks to CI. These checks do not prove a moving phone image reaches a V4L2 device or OBS.
+The workflow cancels superseded runs on the same PR/ref and skips documentation-only pushes/PRs. Code changes keep all checks and failures visible. The two initial failed runs came from browser fixture state preserved by fragment-only navigation; the fixed tests start a new document. The passing runs above are the evidence of that correction.
 
 **Phase 0 hardware acceptance remains open.** Focus, Android screen capture and final packaging were deliberately not advanced before that gate.
