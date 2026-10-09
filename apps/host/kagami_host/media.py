@@ -5,6 +5,7 @@ feeds the same V4L2 writer whenever the phone disconnects or stops producing.
 """
 
 import asyncio
+import ctypes
 import threading
 import time
 
@@ -40,7 +41,16 @@ def configure_ice_ports(receiver, minimum, maximum):
     # with one reference. Restore webrtcbin's ownership only in that case.
     # An already-sunk/fixed binding reports both references and needs no fix.
     if ice.__grefcount__ == 1:
-        ice._ref()
+        # Calling ice._ref() through GI returns the same Python wrapper and
+        # newer PyGObject balances away the added reference while marshalling
+        # that return value. Restore the missing native owner directly instead.
+        pointer = ctypes.pythonapi.PyCapsule_GetPointer
+        pointer.argtypes = [ctypes.py_object, ctypes.c_char_p]
+        pointer.restype = ctypes.c_void_p
+        native_ref = ctypes.CDLL("libgobject-2.0.so.0").g_object_ref
+        native_ref.argtypes = [ctypes.c_void_p]
+        native_ref.restype = ctypes.c_void_p
+        native_ref(pointer(ice.__gpointer__, None))
     ice.set_property("min-rtp-port", minimum)
     ice.set_property("max-rtp-port", maximum)
     return ice
