@@ -31,6 +31,7 @@ const page = await context.newPage();
 const failures = [];
 page.on('pageerror', (error) => failures.push(error.message));
 await page.addInitScript(() => {
+  if (!navigator.mediaDevices) return;
   const RealPeer = window.RTCPeerConnection;
   const capture = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
   window.__tracks = [];
@@ -106,12 +107,29 @@ await page.addInitScript(() => {
   window.WebSocket = LocalSignaler;
 });
 
-const ready = () => page.goto(base + '/#pair=browser-test-fixture');
+const ready = async () => {
+  // The app removes its pairing fragment. Reusing the same URL with another
+  // fragment is a same-document navigation, so explicitly create a fresh page.
+  await page.goto('about:blank');
+  await page.goto(base + '/#pair=browser-test-fixture');
+  assert.equal(await page.evaluate(() => window.__tracks.length), 0);
+};
 const ended = () => page.waitForFunction(() => window.__tracks.every((track) => track.readyState === 'ended') && window.__peers.every((peer) => peer.connectionState === 'closed'));
 let passed = 0;
 async function test(name, run) {
   await ready();
-  await run();
+  try {
+    await run();
+  } catch (error) {
+    console.error('Browser failure diagnostics', await page.evaluate(() => ({
+      state: document.querySelector('#state').textContent,
+      message: document.querySelector('#message').textContent,
+      source: document.querySelector('#source-label').textContent,
+      tracks: window.__tracks.map((track) => ({ state: track.readyState, settings: track.getSettings() })),
+      peers: window.__peers.map((peer) => ({ connection: peer.connectionState, ice: peer.iceConnectionState, signaling: peer.signalingState })),
+    })), failures);
+    throw error;
+  }
   passed += 1;
   console.log(`PASS ${name}`);
 }
