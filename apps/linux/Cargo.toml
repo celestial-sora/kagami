@@ -1,0 +1,13 @@
+[package]
+name = "kagami-linux"
+version = "0.1.0-dev"
+edition = "2021"
+license = "MIT"
+description = "Kagami native Linux host shell for the Phase 0 media spike"
+
+[dependencies]
+gtk = { package = "gtk4", version = "0.9", features = ["v4_6"] }
+adw = { package = "libadwaita", version = "0.7", features = ["v1_2"] }
+serde_json = "1"
+qrcode = { version = "0.14", default-features = false }
+libc = "0.2"

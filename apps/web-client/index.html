@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#151619">
+  <title>Kagami · Phone camera</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <main>
+    <header>
+      <a class="wordmark" href="/" aria-label="Kagami home"><span class="seal" aria-hidden="true">鏡</span><span>kagami<small>PHONE CAMERA</small></span></a>
+      <span class="badge" id="state" role="status">Ready</span>
+    </header>
+    <section class="intro"><p class="eyebrow">A LITTLE CLOSER.</p><h1>Your phone.<br>Your point of view.</h1><p>Send your camera to your computer, directly.</p></section>
+    <section class="viewfinder" aria-label="Camera preview">
+      <video id="preview" playsinline autoplay muted aria-label="Your phone camera preview"></video>
+      <div id="empty"><svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M16 12l3-4h10l3 4h7a4 4 0 014 4v22a4 4 0 01-4 4H9a4 4 0 01-4-4V16a4 4 0 014-4h7z" stroke="currentColor" stroke-width="1.5"/><circle cx="24" cy="27" r="9" stroke="currentColor" stroke-width="1.5"/></svg><p>A window from here to there.</p><small>Your camera opens when you start.</small></div>
+      <span class="frame-label" id="source-label">FRONT CAMERA</span><span class="frame-label right" id="video-spec">720P · 30</span>
+      <div class="live-label" id="live-label" hidden><span></span>LIVE</div>
+    </section>
+    <div class="message" id="message" role="alert" hidden></div>
+    <section class="controls" aria-label="Camera controls">
+      <div class="settings"><label for="quality">Capture quality</label><select id="quality"><option value="720">720p · 30 fps</option><option value="1080">1080p · 30 fps</option></select></div>
+      <div class="secondary"><button id="switch" type="button"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h13m-3-3l3 3-3 3M20 17H7m3-3l-3 3 3 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Switch camera</button><button id="mirror" type="button" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v18M8 6l-5 6 5 6V6zm8 0l5 6-5 6V6z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>Mirror preview</button></div>
+      <button id="start" class="primary" type="button">Start camera<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12h14m-5-5l5 5-5 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button id="stop" class="stop" type="button" hidden>Stop camera</button>
+    </section>
+    <footer><span class="local-dot" aria-hidden="true"></span><span>Just your phone and your computer.</span><span id="stats" aria-live="off"></span></footer>
+    <p class="output-hint" id="output-hint">On your computer, select <strong>Kagami Virtual Camera</strong> in OBS.</p>
+  </main>
+</body>
+</html>

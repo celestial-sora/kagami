@@ -1,0 +1,10 @@
+.local/
+target/
+__pycache__/
+*.pyc
+node_modules/
+test-results/
+*.key
+.env
+.env.*
+config.json

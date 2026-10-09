@@ -1,0 +1,2 @@
+aiohttp>=3.9,<4
+# PyGObject and GStreamer come from the distribution; see docs/fedora-setup.md.
