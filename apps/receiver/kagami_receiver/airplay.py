@@ -19,7 +19,10 @@ from .transport import Device, command
 from .v4l2 import set_output_fps
 
 MEDIA_PLUGINS = ("udpsrc", "rtph264depay", "h264parse", "avdec_h264")
+AUDIO_PLUGINS = ("avdec_aac", "avdec_alac", "audioconvert", "audioresample", "volume", "level", "pulsesink")
+AUDIO_SINK = "pulsesink client-name=Kagami"
 EVENTS_VERSION = "KAGAMI_AIRPLAY_EVENTS_V1"
+AUDIO_VERSION = "KAGAMI_AIRPLAY_AUDIO_V1"
 DISCONNECTED_EVENT = "KAGAMI_AIRPLAY_DISCONNECTED"
 
 
@@ -30,8 +33,8 @@ def capabilities():
     help_text = command([binary, "-rc", "/dev/null", "-h"])
     match = re.search(r"UxPlay\s+(\d+)\.(\d+)(?:\.(\d+))?", help_text)
     if not match or tuple(map(int, match.groups()[:2])) < (1, 73) or any(
-            flag not in help_text for flag in ("-vrtp", "-rc", "-as", "-nh", "-p", EVENTS_VERSION)):
-        raise ReceiverError("unsupported", "Kagami's UxPlay backend with lifecycle events is required; rerun the curl installer.")
+            flag not in help_text for flag in ("-vrtp", "-rc", "-as", "-nh", "-p", EVENTS_VERSION, AUDIO_VERSION)):
+        raise ReceiverError("unsupported", "Kagami's UxPlay backend with lifecycle events and bounded desktop audio is required; rerun the curl installer.")
     return {"binary": binary, "version": match[0]}
 
 
@@ -56,6 +59,10 @@ def preflight():
         missing = [name for name in MEDIA_PLUGINS if not Gst.ElementFactory.find(name)]
         checks.append({"name": "airplay_decoder", "ok": not missing,
                        "detail": "H.264/RTP decoder ready" if not missing else "Missing: " + ", ".join(missing)})
+        missing = [name for name in AUDIO_PLUGINS if not Gst.ElementFactory.find(name)]
+        checks.append({"name": "airplay_audio", "ok": not missing,
+                       "detail": "Audio plays through the desktop output; capture the same output in OBS Desktop Audio." if not missing else
+                       "Missing AirPlay audio plugins: " + ", ".join(missing) + ". Rerun the curl installer."})
     except RuntimeError as exc:
         checks.append({"name": "airplay_decoder", "ok": False, "detail": str(exc)})
     return checks
@@ -85,6 +92,7 @@ class AirPlayTransport:
         self.logs = deque(maxlen=20)
         self.last_frame = 0
         self.disconnected = threading.Event()
+        self.audio_failed = threading.Event()
 
     def start(self, source, fps):
         if self.process or self.pipeline:
@@ -108,9 +116,10 @@ class AirPlayTransport:
             # The bridge is loopback-only. Ignore personal UxPlay startup options,
             # which could otherwise enable recordings or redirect this pipeline.
             args = [capabilities()["binary"], "-rc", "/dev/null", "-n", "Kagami", "-nh",
-                    "-s", f"1280x720@{fps}", "-p", str(self.port), "-as", "0", "-vrtp",
+                    "-s", f"1280x720@{fps}", "-p", str(self.port), "-as", AUDIO_SINK, "-vrtp",
                     f"pt=96 config-interval=1 ! udpsink host=127.0.0.1 port={port} sync=false"]
             self.disconnected.clear()
+            self.audio_failed.clear()
             self.logs.clear()
             self.process = subprocess.Popen(args, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                                             stderr=subprocess.STDOUT, text=True, start_new_session=True)
@@ -129,6 +138,8 @@ class AirPlayTransport:
         line = line.strip()
         if line == DISCONNECTED_EVENT:
             self.disconnected.set()
+        if "GStreamer error (audio):" in line:
+            self.audio_failed.set()
         self.logs.append(line[:1000])
 
     def _frame(self, _pad, _info):
@@ -143,6 +154,8 @@ class AirPlayTransport:
             return ReceiverError("connectivity", "AirPlay backend stopped. " + " ".join(self.logs)[-1000:])
         if self.disconnected.is_set():
             return ReceiverError("connectivity", "AirPlay device disconnected. Stop mirroring on the device, then restart Kagami reception.")
+        if self.audio_failed.is_set():
+            return ReceiverError("decoder", "AirPlay audio output failed. Check Ubuntu's sound output and user audio service, then restart reception.")
         if self.pipeline:
             if error := pipeline_error(self.Gst, self.pipeline):
                 return error
@@ -174,4 +187,5 @@ class AirPlayTransport:
         self.process = self.reader = None
         self.last_frame = 0
         self.disconnected.clear()
+        self.audio_failed.clear()
         self.state = "stopped"

@@ -31,7 +31,7 @@ for sock in reservations:
     sock.close()
 with tempfile.TemporaryFile(mode="w+") as logs:
     process = subprocess.Popen([binary, "-rc", "/dev/null", "-n", name, "-nh", "-p", str(candidate),
-                                "-m", "02:00:00:ca:fe:01", "-as", "0", "-vrtp",
+                                "-m", "02:00:00:ca:fe:01", "-as", "fakesink", "-vrtp",
                                 "pt=96 ! udpsink host=127.0.0.1 port=49999 sync=false"],
                                stdin=subprocess.DEVNULL, stdout=logs, stderr=subprocess.STDOUT, start_new_session=True)
     try:

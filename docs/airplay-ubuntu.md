@@ -1,12 +1,20 @@
 # AirPlay on Ubuntu
 
-Kagami's experimental AirPlay adapter uses [UxPlay](https://github.com/FDH2/UxPlay) as a separate, unprivileged protocol/discovery process. The curl installer builds inspected UxPlay v1.73.2 at `4764e4619e8924f43601d778277fc9f0bf280597` with Kagami's timestamp and lifecycle fixes and installs it as `/usr/local/bin/kagami-uxplay`, preserving any independent `uxplay` installation. The receiver requires the `KAGAMI_AIRPLAY_EVENTS_V1` capability in backend help; an unpatched standalone UxPlay is insufficient. License, llhttp license and version record are under `/usr/local/share/doc/kagami-uxplay/`.
+Kagami's experimental AirPlay adapter uses [UxPlay](https://github.com/FDH2/UxPlay) as a separate, unprivileged protocol/discovery process. The curl installer builds inspected UxPlay v1.73.2 at `4764e4619e8924f43601d778277fc9f0bf280597` with Kagami's timestamp, lifecycle and bounded audio fixes and installs it as `/usr/local/bin/kagami-uxplay`, preserving any independent `uxplay` installation. The receiver requires the `KAGAMI_AIRPLAY_EVENTS_V1` and `KAGAMI_AIRPLAY_AUDIO_V1` capabilities in backend help; an unpatched standalone UxPlay is insufficient. License, llhttp license and version record are under `/usr/local/share/doc/kagami-uxplay/`.
 
 ## Use
 
 Run the [one-command installer](installation.md), then open Kagami. Choose **AirPlay**, click **Check AirPlay**, then **Start AirPlay** in the fixed top controls. On iPhone/iPad/Mac open **Screen Mirroring → Kagami** while connected to the same local network. Apply a crop and select **Kagami Virtual Camera** in OBS. Click Stop in Kagami to stop its receiver and decoding. Merely opening the app does not advertise Kagami: it appears in Screen Mirroring only while the receiver is started. The Start/Stop buttons and status remain visible above the scrollable preview/settings, including on smaller windows.
 
 AirPlay needs ordinary LAN access and Avahi/mDNS discovery; it does not require P2P-client/P2P-GO or disconnect the Wi-Fi adapter. Native Galaxy Smart View is a Miracast sender. A Samsung device would require a separate AirPlay sender implementation; no Android sender app has been selected or validated here.
+
+## Speakers and OBS Desktop Audio
+
+AirPlay audio is enabled through `pulsesink client-name=Kagami`, using the ordinary user-session PulseAudio service or PipeWire's PulseAudio compatibility service. Ubuntu's selected output plays the sound; choose the computer speakers in **Settings → Sound → Output** if desired. Kagami does not change the system's output selection or volume. The sender and desktop output must be unmuted.
+
+In OBS, enable **Settings → Audio → Desktop Audio** and choose the same output device (or **Default** when that is the desktop default). A PulseAudio Audio Output Capture source for that device is another option. Use one capture path for it to avoid duplicated audio. The Virtual Camera supplies video only. OBS captures other desktop sounds on that output too.
+
+Rerun the curl installer for this update, then close/reopen Kagami and restart Screen Mirroring. The changed backend recipe triggers one UxPlay rebuild; subsequent unchanged installs reuse it. Audio stops with the owned child on Stop, close or detected disconnect. Synthetic decoding and user-session output connection pass; actual iPad sound, OBS mixer capture and A/V synchronization still need a physical-device check.
 
 ## Camera output size
 
@@ -22,7 +30,7 @@ The pinned backend gets two compatibility fixes: the missing stdio.h declaration
 
 A fixed input canvas keeps V4L2 dimensions stable when the sender changes orientation. Crop is expressed in that canvas; portrait borders can be cropped. Stop/restart after changing orientation and adjust framing. This does not implement automatic orientation/preset tracking.
 
-UxPlay receives `-rc /dev/null` so personal startup files cannot activate recordings or change Kagami's bridge. Audio, HLS streaming and H265 are not enabled. Screen media is not saved. Logs and frame queues are bounded. A static screen may stop producing changed video: Kagami retains the latest frame and keeps the camera writer at the chosen FPS, without an idle media timeout. Explicit video teardown, video TCP EOF, all client control connections closing, connection reset or UxPlay's existing client-feedback watchdog emit a fixed, immediately flushed disconnect event. The receiver then stops its owned listener/decoder and leaves the output black until Stop/reconnect. Discovery probes closing before any mirrored video do not trigger that event. Before first connection, the listener waits without the ADB timeout. Wireless phone identity/preset saving is disabled.
+UxPlay receives `-rc /dev/null` so personal startup files cannot activate recordings or change Kagami's bridge. Audio plays locally; HLS streaming and H265 are not enabled. Screen media and audio are not saved. Logs and frame queues are bounded; each compressed audio input queue holds at most 64 buffers or two seconds, dropping the oldest on a stall. A static screen may stop producing changed video: Kagami retains the latest frame and keeps the camera writer at the chosen FPS, without an idle media timeout. Explicit video teardown, video TCP EOF, all client control connections closing, connection reset or UxPlay's existing client-feedback watchdog emit a fixed, immediately flushed disconnect event. The receiver then stops its owned listener/decoder and leaves the output black until Stop/reconnect. Discovery probes closing before any mirrored video do not trigger that event. Before first connection, the listener waits without the ADB timeout. Wireless phone identity/preset saving is disabled.
 
 ## Diagnostics and network
 

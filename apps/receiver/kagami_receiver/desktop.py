@@ -51,6 +51,7 @@ class Window(Gtk.ApplicationWindow):
         self.adb_info = self.label("USB: enable Developer options → USB debugging, unlock the phone, and accept its authorization prompt.")
         body.append(self.adb_info)
         body.append(self.label("Smart View: Galaxy → Smart View → Kagami. AirPlay: same local network → Screen Mirroring → Kagami."))
+        body.append(self.label("AirPlay audio plays through Ubuntu's selected sound output. In OBS, select that output for Desktop Audio; the virtual camera carries video only."))
         smart = Gtk.Box(spacing=8)
         self.interface = Gtk.Entry(text=interface, placeholder_text="P2P Wi-Fi interface")
         self.allow_disconnect = Gtk.CheckButton(label="Allow this adapter to disconnect while receiving")

@@ -33,7 +33,7 @@ The former browser connection URL, QR generator, browser camera client and HTTPS
 ## Capabilities and limits
 
 - Shared crop → clockwise rotation → mirror → scale/fit/fill → FPS processing; bounded previews and a persistent YUY2 output with black fallback on disconnect.
-- No cloud, account or default image/video recording. AirPlay audio is disabled; this is a screen-to-camera workflow.
+- No cloud, account or default image/video recording. AirPlay audio plays through Ubuntu's selected sound output for speakers and OBS Desktop Audio; the virtual camera carries video only.
 - AirPlay receives H264/RTP over a private local bridge and fits the screen into a fixed 1280×720 input canvas. Portrait input has side borders; crop them out. Stop/restart and adjust crop after rotating the phone. Wireless phone identity/preset persistence is not implemented.
 - ADB capture orientation is locked at connection. Only authorized ADB devices have per-device/app/captured-size saved presets.
 - Crop removes overlays outside the rectangle. Overlays inside remain; protected surfaces may be black. Effects survive only when the sender app permits screen mirroring.

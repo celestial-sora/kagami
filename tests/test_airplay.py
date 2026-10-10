@@ -11,17 +11,17 @@ from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "apps/receiver"))
-from kagami_receiver.airplay import AirPlayTransport, DISCONNECTED_EVENT, EVENTS_VERSION, capabilities, media_description, preflight
+from kagami_receiver.airplay import AirPlayTransport, AUDIO_VERSION, DISCONNECTED_EVENT, EVENTS_VERSION, capabilities, media_description, preflight
 from kagami_receiver.model import FrameFormat, ReceiverError
 
 
 class AirPlayContractTests(unittest.TestCase):
     def test_backend_version_and_required_flags(self):
-        valid = "UxPlay 1.73.2 -vrtp -rc -as -nh -p " + EVENTS_VERSION
+        valid = "UxPlay 1.73.2 -vrtp -rc -as -nh -p " + EVENTS_VERSION + " " + AUDIO_VERSION
         with patch("kagami_receiver.airplay.shutil.which", return_value="/usr/bin/uxplay"), patch("kagami_receiver.airplay.command", return_value=valid) as command:
             self.assertEqual(capabilities()["version"], "UxPlay 1.73.2")
             command.assert_called_once_with(["/usr/bin/uxplay", "-rc", "/dev/null", "-h"])
-        for invalid in (valid.replace("1.73.2", "1.68"), valid.replace("-vrtp", ""), valid.replace(EVENTS_VERSION, ""), "Unknown backend"):
+        for invalid in (valid.replace("1.73.2", "1.68"), valid.replace("-vrtp", ""), valid.replace(EVENTS_VERSION, ""), valid.replace(AUDIO_VERSION, ""), "Unknown backend"):
             with patch("kagami_receiver.airplay.shutil.which", return_value="uxplay"), patch("kagami_receiver.airplay.command", return_value=invalid), self.assertRaises(ReceiverError):
                 capabilities()
         with patch("kagami_receiver.airplay.shutil.which", return_value=None), self.assertRaises(ReceiverError):
@@ -41,6 +41,16 @@ class AirPlayContractTests(unittest.TestCase):
                 patch("kagami_receiver.airplay.subprocess.run", return_value=Mock(returncode=3, stdout="inactive")), \
                 patch("kagami_receiver.airplay.gst", side_effect=ReceiverError("decoder", "missing plugins")):
             self.assertTrue(all(not c["ok"] for c in preflight()))
+
+    def test_preflight_reports_missing_desktop_audio_plugin(self):
+        with patch("kagami_receiver.airplay.capabilities", return_value={"version": "UxPlay 1.73.2"}), \
+                patch("kagami_receiver.airplay.subprocess.run", return_value=Mock(returncode=0, stdout="active\n")), \
+                patch("kagami_receiver.airplay.gst") as gst:
+            gst.return_value.ElementFactory.find.side_effect = lambda name: name != "pulsesink"
+            checks = {c["name"]: c for c in preflight()}
+            self.assertTrue(checks["airplay_decoder"]["ok"])
+            self.assertFalse(checks["airplay_audio"]["ok"])
+            self.assertIn("pulsesink", checks["airplay_audio"]["detail"])
 
     def test_ports_and_fps_are_bounded(self):
         for port in (0, 1023, 65534, "35000", True):
@@ -82,6 +92,13 @@ class AirPlayContractTests(unittest.TestCase):
         self.assertEqual(len(adapter.logs), 20)
         self.assertTrue(all(len(line) == 1000 for line in adapter.logs))
 
+    def test_backend_audio_failure_is_reported_and_stop_clears_it(self):
+        adapter = AirPlayTransport()
+        adapter._read_line("GStreamer error (audio): pulsesink Connection terminated")
+        self.assertIn("sound output", str(adapter.failure()))
+        adapter.stop()
+        self.assertIsNone(adapter.failure())
+
     def test_start_failure_releases_decoder_before_returning(self):
         gst = Mock()
         gst.parse_launch.return_value.set_state.return_value = gst.StateChangeReturn.FAILURE
@@ -110,8 +127,9 @@ class AirPlayContractTests(unittest.TestCase):
                 self.assertEqual(args[1:3], ["-rc", "/dev/null"])
                 self.assertIn("-vrtp", args)
                 self.assertIn("host=127.0.0.1", args[-1])
-                self.assertEqual(args[args.index("-as") + 1], "0")
+                self.assertEqual(args[args.index("-as") + 1], "pulsesink client-name=Kagami")
                 self.assertNotIn("-mp4", args)
+                self.assertNotIn("-artp", args)
                 self.assertEqual(adapter.state, "listening")
                 self.assertTrue(adapter.disconnected.wait(timeout=2), "Owned child lifecycle event was not consumed")
                 self.assertEqual(adapter.failure().category, "connectivity")

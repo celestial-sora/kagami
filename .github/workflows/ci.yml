@@ -1,7 +1,7 @@
 name: Checks
 on:
   push:
-    branches: [main, 'feat/**', 'fix/**']
+    branches: [main, 'feat/**', 'fix/**', 'codex/**']
     paths-ignore:
       - 'docs/**'
       - 'README.md'
@@ -62,6 +62,7 @@ jobs:
           bash tools/build-uxplay.sh /tmp/kagami-airplay-source /tmp/kagami-airplay-stage
           G_DEBUG=fatal-criticals python3 tools/check_airplay_timestamps.py /tmp/kagami-airplay-source
           G_DEBUG=fatal-criticals python3 tools/check_airplay_lifecycle.py /tmp/kagami-airplay-source
+          G_DEBUG=fatal-criticals python3 tools/check_airplay_audio.py /tmp/kagami-airplay-source
           /tmp/kagami-airplay-stage/usr/local/bin/uxplay -rc /dev/null -h
           sudo systemctl start avahi-daemon.service
           python3 tools/check_airplay_backend.py /tmp/kagami-airplay-stage/usr/local/bin/uxplay

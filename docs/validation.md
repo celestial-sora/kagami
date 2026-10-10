@@ -1,3 +1,10 @@
+# AirPlay desktop audio · 2026-10-10
+
+- The maintainer requests sound from the computer speakers so OBS can capture Desktop Audio, overriding the earlier audio-disabled instruction. The receiver previously passed `-as 0`; it now selects the user-session `pulsesink client-name=Kagami` output, while ignoring personal UxPlay configuration and retaining the local video bridge.
+- The pinned backend builds successfully with bounded compressed input queues (64 buffers/two seconds, oldest dropped on stalls). A native harness compiles the actual audio renderer, pushes 1000 buffers into a stalled input without exceeding its limit, decodes eight non-silent synthetic ALAC buffers in memory, and confirms Stop returns the pipeline to NULL. It uses synthetic encoder codec metadata, not captured phone audio. AAC-ELD negotiation remains a physical-device check.
+- All **64** contracts/media tests pass with fatal criticals, including missing audio plugins, runtime output errors, backend capabilities and owned-child teardown. Native RTP timestamps/lifecycle, actual Avahi advertisement with initialized fake audio output, GTK/Xvfb, ShellCheck, compilation and diff checks pass. A real user-session pulsesink reaches READY successfully without playing sound.
+- Desktop/docs explain selecting Ubuntu’s output and the same OBS Desktop Audio device. No host audio selection, OBS configuration, privileged setup or network management is changed. Actual iPad sound through speakers, OBS mixer capture and A/V synchronization remain pending. Updating via the curl installer rebuilds the changed UxPlay recipe once; no media is recorded.
+
 # 1080p camera output and held consumer · 2026-10-10
 
 - With OBS holding video10, the actual GStreamer sink exposed only 1280×720. Requesting 1920×1080 failed negotiation. After the maintainer released the camera, a real named-loopback consumer read five complete 1920×1080 YUY2 frames (4,147,200 bytes each), and the maintainer explicitly confirms **1080p works**.

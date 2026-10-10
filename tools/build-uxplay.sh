@@ -15,7 +15,7 @@ git -C "$source_dir" checkout -q --detach FETCH_HEAD
 [[ $(git -C "$source_dir" rev-parse HEAD) == "$uxplay_sha" ]] || exit 2
 # v1.73.2 uses printf here without declaring it; GCC 14+ rejects this.
 # Keep the pinned source and compiler diagnostics, adding the missing header.
-python3 - "$source_dir/renderers/video_renderer.c" "$source_dir/uxplay.cpp" "$source_dir/lib/raop_rtp_mirror.c" <<'PY'
+python3 - "$source_dir/renderers/video_renderer.c" "$source_dir/uxplay.cpp" "$source_dir/lib/raop_rtp_mirror.c" "$source_dir/renderers/audio_renderer.c" <<'PY'
 from pathlib import Path
 import sys
 path = Path(sys.argv[1])
@@ -65,7 +65,7 @@ fixes = (
      '    kagami_mirroring.store(true);\n', 1),
     ('    printf("UxPlay %s: An open-source AirPlay mirroring server.\\n", VERSION);\n',
      '    printf("UxPlay %s: An open-source AirPlay mirroring server.\\n", VERSION);\n'
-     '    puts("KAGAMI_AIRPLAY_EVENTS_V1");\n', 1),
+     '    puts("KAGAMI_AIRPLAY_EVENTS_V1 KAGAMI_AIRPLAY_AUDIO_V1");\n', 1),
 )
 for anchor, replacement, count in fixes:
     if source.count(anchor) != count:
@@ -88,6 +88,17 @@ for anchor, replacement, count in fixes:
         raise SystemExit("Pinned UxPlay context changed; review the video EOF fixes.")
     source = source.replace(anchor, replacement)
 path.write_text(source)
+# Audio is now played locally. Bound the compressed input even if the desktop
+# output stalls; appsrc's default nonblocking queue otherwise grows indefinitely.
+path = Path(sys.argv[4])
+source = path.read_text()
+anchor = '"stream-type", 0, "is-live", TRUE, "format", GST_FORMAT_TIME, NULL);'
+replacement = ('"stream-type", 0, "is-live", TRUE, "format", GST_FORMAT_TIME, '
+               '"max-buffers", (guint64) 64, "max-bytes", (guint64) 0, '
+               '"max-time", (guint64) (2 * GST_SECOND), "leaky-type", 2, NULL);')
+if source.count(anchor) != 1:
+    raise SystemExit("Pinned UxPlay context changed; review the bounded audio input fix.")
+path.write_text(source.replace(anchor, replacement))
 PY
 printf 'Kagami · Build UxPlay: configuring\n'
 cmake -S "$source_dir" -B "$source_dir/build" -DCMAKE_BUILD_TYPE=Release \
