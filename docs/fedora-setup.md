@@ -2,7 +2,7 @@
 
 These are reproducible setup instructions for the target machine, not a claim that this execution environment is Fedora or has tested the driver.
 
-For automated setup use the [one-command installer](installation.md).
+For automated setup use the [historical V1 installer](installation-v1.md).
 
 ## Userspace packages
 
@@ -22,7 +22,7 @@ Use the system Python so it can import the distribution's PyGObject. A separatel
 
 ## Virtual camera driver
 
-For manual setup, install a distribution-appropriate `v4l2loopback` module for the running kernel and check its Secure Boot signing requirements. The [automated installer](installation.md) can enable RPM Fusion Free and build its camera module; the runtime host stays unprivileged. See [upstream setup](https://github.com/v4l2loopback/v4l2loopback#installation).
+For manual setup, install a distribution-appropriate `v4l2loopback` module for the running kernel and check its Secure Boot signing requirements. The [historical V1 installer](installation-v1.md) can enable RPM Fusion Free and build its camera module; the runtime host stays unprivileged. See [upstream setup](https://github.com/v4l2loopback/v4l2loopback#installation).
 
 After the module is installed, pick an unused device number. For example, after checking that `/dev/video10` is free:
 

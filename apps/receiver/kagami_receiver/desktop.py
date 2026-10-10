@@ -16,7 +16,7 @@ from .smartview import SmartViewTransport, preflight
 
 
 class Window(Gtk.ApplicationWindow):
-    def __init__(self, app, config):
+    def __init__(self, app, config, interface="wlo1"):
         super().__init__(application=app, title="Kagami · 鏡", default_width=1040, default_height=800)
         self.receiver, self.presets = Receiver(config), Presets()
         self.items, self.busy, self.closing = [], False, False
@@ -44,7 +44,7 @@ class Window(Gtk.ApplicationWindow):
         body.append(self.label("USB: enable Developer options → USB debugging, unlock the phone, and accept its authorization prompt."))
         body.append(self.label("Smart View uses Miracast/Wi-Fi Direct, not ADB. Google Cast remains research-only. Smart View interoperability needs a real Galaxy test."))
         smart = Gtk.Box(spacing=8)
-        self.interface = Gtk.Entry(text="wlo1", placeholder_text="P2P Wi-Fi interface")
+        self.interface = Gtk.Entry(text=interface, placeholder_text="P2P Wi-Fi interface")
         self.allow_disconnect = Gtk.CheckButton(label="Allow this adapter to disconnect while receiving")
         check_smart = Gtk.Button(label="Check Smart View")
         check_smart.connect("clicked", self.check_smartview)
@@ -360,7 +360,7 @@ class Window(Gtk.ApplicationWindow):
         return GLib.SOURCE_CONTINUE
 
 
-def run(config):
+def run(config, interface="wlo1"):
     app = Gtk.Application(application_id="io.kagami.Receiver")
-    app.connect("activate", lambda app: Window(app, config).present() if not app.get_active_window() else app.get_active_window().present())
+    app.connect("activate", lambda app: Window(app, config, interface).present() if not app.get_active_window() else app.get_active_window().present())
     return app.run([])

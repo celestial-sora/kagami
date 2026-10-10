@@ -1,289 +1,196 @@
 #!/usr/bin/env bash
-# Fedora Workstation bootstrap. The application and build run as the caller.
+# Ubuntu V2 bootstrap. curl stdin never feeds package/build commands.
 set -euo pipefail
-
 kagami_log() { printf '\nKagami · %s\n' "$*"; }
 kagami_fail() { printf '\nKagami: %s\n' "$*" >&2; return 2; }
-
 kagami_plan() {
     cat <<'PLAN'
-Kagami installer · Fedora Workstation (DNF, systemd)
-  1. Install GTK/Rust/GStreamer and system Python dependencies with sudo.
-  2. Enable RPM Fusion Free; build v4l2loopback for installed Fedora kernels.
-  3. Build Kagami as your ordinary user, using the selected Git ref.
-  4. Preserve existing settings/CA, or create local HTTPS configuration.
-  5. Install an application-menu launcher and a narrow camera setup service.
-  6. Allow HTTPS + bounded ICE UDP only from the selected local subnet.
-A newer installed kernel or Secure Boot key enrollment may require one reboot.
-Phone certificate trust and camera permission still need your first-time action.
---dry-run prints this plan without installing, downloading, or changing files.
+Kagami V2 installer · Ubuntu 24.04 / 26.04 desktop
+  1. Install GTK4/GStreamer, Wi-Fi Direct tools and matching kernel headers.
+  2. Build pinned MiracleCast as your ordinary user.
+  3. Install root-owned helpers and two guarded virtual camera nodes.
+  4. Replace the Kagami launcher with the new native screen receiver.
+  5. Preserve settings/presets and report Smart View prerequisites.
+Run again to update. App/media never run as root.
+Secure Boot enrollment may require a password/reboot; it is never disabled.
+Smart View needs a P2P-capable adapter and Galaxy; hardware testing is pending.
+Installation does not disconnect Wi-Fi or start a mirroring session.
+--dry-run prints this plan without downloads, installation or file changes.
 PLAN
 }
-
-kagami_number() {
-    local source=$1 config=$2 name number
-    if [[ -f $config ]]; then
-        PYTHONPATH="$source/apps/host" python3 - "$config" <<'PY'
-from pathlib import Path
-import sys
-from kagami_host.config import load_config
-print(int(load_config(Path(sys.argv[1])).device.removeprefix('/dev/video')))
-PY
-        return
+kagami_platform() {
+    (( EUID != 0 )) || { kagami_fail 'Run as your desktop user, without sudo. System setup will request authentication.'; return 2; }
+    [[ $(uname -s) == Linux ]] || { kagami_fail 'This installer supports Ubuntu desktops.'; return 2; }
+    # shellcheck source=/dev/null
+    . /etc/os-release
+    [[ ${ID:-} == ubuntu && ( ${VERSION_ID:-} == 24.04 || ${VERSION_ID:-} == 26.04 ) ]] || {
+        kagami_fail 'Use an Ubuntu 24.04 or 26.04 desktop. Historical Fedora V1 setup is install-v1.sh.'; return 2;
+    }
+    if command -v systemd-detect-virt >/dev/null && systemd-detect-virt --container --quiet; then
+        kagami_fail 'Install on the desktop host, not in a container.'; return 2
     fi
-    for name in /sys/class/video4linux/video*/name; do
-        [[ -f $name ]] || continue
-        if [[ $(cat "$name") == 'Kagami Virtual Camera' ]]; then
-            number=${name%/name}; printf '%s\n' "${number##*/video}"; return
+    command -v sudo >/dev/null || { kagami_fail 'sudo is required for dependencies and the camera driver.'; return 2; }
+    [[ -r /dev/tty && -w /dev/tty ]] || { kagami_fail 'Run the curl command in an interactive terminal for authentication.'; return 2; }
+}
+kagami_camera_module() {
+    local running=$1 vermagic
+    sudo dkms autoinstall -k "$running" < /dev/null || { kagami_fail "DKMS camera build failed for $running. Review the log above."; return 2; }
+    vermagic=$(modinfo -k "$running" -F vermagic v4l2loopback) || { kagami_fail "No camera module for $running; matching headers are required."; return 2; }
+    [[ $vermagic == "$running "* ]] || { kagami_fail "Camera module does not match $running."; return 2; }
+}
+kagami_secure_boot() {
+    local certificate
+    if ! LC_ALL=C mokutil --sb-state 2>/dev/null | grep -q 'SecureBoot enabled'; then return 0; fi
+    for certificate in /var/lib/shim-signed/mok/MOK.der /var/lib/dkms/mok.pub; do
+        if sudo test -f "$certificate"; then
+            if sudo mokutil --test-key "$certificate" >/dev/null 2>&1; then return 0; fi
+            kagami_log 'Secure Boot: set an enrollment password; on reboot choose Enroll MOK and confirm it.'
+            # stdin is the curl pipe; enrollment reads the user's terminal.
+            # shellcheck disable=SC2024
+            sudo mokutil --import "$certificate" < /dev/tty || return 2
+            return 10
         fi
     done
-    for ((number=10; number<=63; number++)); do
-        if [[ ! -e /dev/video$number && ! -L /dev/video$number ]]; then
-            printf '%s\n' "$number"; return
-        fi
+    kagami_fail 'Secure Boot is enabled but no DKMS signing certificate was found. Configure Ubuntu DKMS signing, then rerun.'
+}
+kagami_install_miraclecast() {
+    local source=$1 stage=$2 binary
+    bash "$source/tools/build-miraclecast.sh" "$stage/miraclecast" "$stage/miracle-payload" < /dev/null
+    for binary in miracle-wifid miracle-sinkctl miracle-dhcp; do
+        sudo install -D -o root -g root -m 755 "$stage/miracle-payload/usr/local/bin/$binary" "/usr/local/bin/$binary"
     done
-    kagami_fail 'No free virtual camera slot between video10 and video63.'
-}
-
-kagami_kernel_ready() {
-    local kernel=$1
-    rpm -q "kernel-core-$kernel" "kernel-devel-$kernel" >/dev/null 2>&1 &&
-        [[ -r /boot/vmlinuz-$kernel && -d /lib/modules/$kernel ]] &&
-        [[ -r /usr/src/kernels/$kernel/Makefile || -r /lib/modules/$kernel/build/Makefile ]]
-}
-
-kagami_installed_kernels() {
-    local kernel arch
-    arch=$(uname -m)
-    while IFS= read -r kernel; do
-        if [[ $kernel == *."$arch" ]]; then printf '%s\n' "$kernel"; fi
-    done < <(rpm -q --qf '%{VERSION}-%{RELEASE}.%{ARCH}\n' kernel-core 2>/dev/null | sort -Vu)
-}
-
-kagami_kernel_devel_url() {
-    local kernel=$1 version release arch signature key
-    # Only construct archive paths from an installed Fedora kernel's metadata.
-    [[ $kernel =~ ^([0-9][A-Za-z0-9._+~]*)-([A-Za-z0-9._+~]+\.fc[0-9]+)\.([A-Za-z0-9_]+)$ ]] || return 1
-    version=${BASH_REMATCH[1]}; release=${BASH_REMATCH[2]}; arch=${BASH_REMATCH[3]}
-    [[ $arch == "$(uname -m)" ]] || return 1
-    signature=$(LC_ALL=C rpm -q --qf '%{RSAHEADER:pgpsig}' "kernel-core-$kernel") || return 1
-    key=${signature##*Key ID }; key=${key,,}
-    [[ $key =~ ^[0-9a-f]{16}$ ]] || return 1
-    printf 'https://kojipkgs.fedoraproject.org/packages/kernel/%s/%s/data/signed/%s/%s/kernel-devel-%s.rpm\n' \
-        "$version" "$release" "${key: -8}" "$arch" "$kernel"
-}
-
-kagami_ensure_kernel_devel() {
-    local kernel=$1 url
-    kagami_kernel_ready "$kernel" && return 0
-    # Preserve all installed versions during these exact-devel transactions.
-    if sudo dnf install -y --setopt=installonly_limit=0 "kernel-devel-$kernel"; then
-        kagami_kernel_ready "$kernel" && return 0
-    fi
-    url=$(kagami_kernel_devel_url "$kernel") || return 1
-    kagami_log "Looking up signed Fedora development files for $kernel in Koji"
-    # Direct RPM URLs otherwise default to no signature check in DNF.
-    sudo dnf install -y --setopt=installonly_limit=0 --setopt=localpkg_gpgcheck=True "$url" || return 1
-    kagami_kernel_ready "$kernel"
-}
-
-kagami_prepare_camera_kernels() {
-    local kernel vermagic kernels=()
-    mapfile -t kernels < <(kagami_installed_kernels)
-    (( ${#kernels[@]} )) || { kagami_fail 'No installed Fedora kernel-core packages were found for this architecture.'; return 2; }
-    for kernel in "${kernels[@]}"; do
-        kagami_log "Preparing virtual camera driver for $kernel"
-        kagami_ensure_kernel_devel "$kernel" || {
-            kagami_fail "Matching signed development files for $kernel could not be installed. Review the DNF/Koji error above."; return 2;
-        }
-        sudo akmods --force --kernels "$kernel" --akmod v4l2loopback || {
-            kagami_fail "Virtual camera driver build failed for $kernel. See /var/cache/akmods/v4l2loopback/ for the build log."; return 2;
-        }
-        vermagic=$(modinfo -k "$kernel" -F vermagic v4l2loopback) || return 2
-        [[ $vermagic == "$kernel "* ]] || {
-            kagami_fail "Virtual camera module does not match $kernel."; return 2;
-        }
+    sudo install -D -o root -g root -m 644 "$stage/miracle-payload/etc/dbus-1/system.d/org.freedesktop.miracle.conf" /etc/dbus-1/system.d/org.freedesktop.miracle.conf
+    for binary in COPYING LICENSE_lgpl LICENSE_htable LICENSE_gdhcp VERSION; do
+        sudo install -D -o root -g root -m 644 "$stage/miracle-payload/usr/local/share/doc/kagami-miraclecast/$binary" "/usr/local/share/doc/kagami-miraclecast/$binary"
     done
+    sudo busctl --system call org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus ReloadConfig < /dev/null
+    /usr/local/bin/miracle-wifid --help > /dev/null
+    /usr/local/bin/miracle-sinkctl --help > /dev/null
 }
-
-kagami_select_kernel() {
-    local running=$1 candidate arch
-    if kagami_kernel_ready "$running"; then
-        printf '%s\n' "$running"; return
-    fi
-    arch=$(uname -m)
-    while IFS= read -r candidate; do
-        [[ $candidate == *."$arch" && $candidate != "$running" ]] || continue
-        # Only stage a newer installed kernel; never downgrade or change boot settings.
-        [[ $(printf '%s\n' "$running" "$candidate" | sort -V | tail -n 1) == "$candidate" ]] || continue
-        if kagami_kernel_ready "$candidate"; then
-            printf '%s\n' "$candidate"; return
-        fi
-    done < <(kagami_installed_kernels | sort -Vr)
-    return 1
+kagami_install_dependencies() {
+    local running=$1
+    # shellcheck disable=SC2024
+    sudo -v < /dev/tty
+    kagami_log 'Installing Ubuntu dependencies and camera driver'
+    sudo apt-get update < /dev/null
+    # DKMS/shim-signed can ask for MOK enrollment via debconf on the terminal.
+    # shellcheck disable=SC2024
+    sudo apt-get install -y git build-essential meson ninja-build pkg-config libglib2.0-dev \
+        libreadline-dev libudev-dev libsystemd-dev python3 python3-gi python3-gi-cairo \
+        python3-cairo python3-gst-1.0 gir1.2-gtk-4.0 gstreamer1.0-tools \
+        gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
+        gstreamer1.0-libav iw network-manager wpasupplicant pkexec polkitd \
+        iproute2 dbus v4l-utils v4l2loopback-dkms v4l2loopback-utils dkms mokutil \
+        "linux-headers-$running" < /dev/tty
 }
-
 kagami_main() {
     case ${1:-} in
         --help|--dry-run) kagami_plan; return 0 ;;
         '') ;;
         *) kagami_fail 'Supported options: --help, --dry-run'; return 2 ;;
     esac
-    (( EUID != 0 )) || { kagami_fail 'Run this command as your desktop user, without sudo. The installer requests sudo only for system setup.'; return 2; }
-    [[ $(uname -s) == Linux ]] || { kagami_fail 'This installer supports Fedora Workstation.'; return 2; }
-    # os-release is a distribution-owned local shell data file.
-    # shellcheck source=/dev/null
-    . /etc/os-release
-    [[ ${ID:-} == fedora && ! -e /run/ostree-booted ]] || {
-        kagami_fail 'This installer requires DNF-based Fedora. Atomic/Silverblue and other distributions need separate packaging.'; return 2;
-    }
-    if command -v systemd-detect-virt >/dev/null && systemd-detect-virt --container --quiet; then
-        kagami_fail 'Install on the Fedora desktop host, not inside a container.'; return 2
-    fi
-    command -v sudo >/dev/null || { kagami_fail 'sudo is required for system dependencies and the virtual camera.'; return 2; }
+    kagami_platform
     local ref=${KAGAMI_REF:-main}
     [[ $ref =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ && $ref != *..* ]] || { kagami_fail 'Invalid KAGAMI_REF.'; return 2; }
     local data=${XDG_DATA_HOME:-$HOME/.local/share} config=${XDG_CONFIG_HOME:-$HOME/.config}/kagami
     [[ $data == /* && $config == /* ]] || { kagami_fail 'XDG paths must be absolute.'; return 2; }
-    local root=$data/kagami stage source running kernel sha number network payload version
-    local pending=0 kernel_pending=0 mok_pending=0
+    local root=$data/kagami source sha version stage running output input interface status helper
+    local pending=0 interface_args=() kagami_settings=()
     mkdir -p "$root"
     exec 9> "$root/install.lock"
-    flock -n 9 || { kagami_fail 'Another Kagami installation is already running.'; return 2; }
+    flock -n 9 || { kagami_fail 'Another Kagami installation is running.'; return 2; }
     KAGAMI_INSTALL_TEMP=$(mktemp -d "${TMPDIR:-/tmp}/kagami-install.XXXXXXXX")
     stage=$KAGAMI_INSTALL_TEMP
-    # stage is always an installer-owned mktemp directory, never an input path.
     trap 'rm -rf -- "$KAGAMI_INSTALL_TEMP"' EXIT
     kagami_plan
-    sudo -v
     running=$(uname -r)
-    kagami_log 'Installing build and media dependencies'
-    sudo dnf install -y git rust cargo gcc pkgconf-pkg-config gtk4-devel libadwaita-devel \
-        python3 python3-gobject python3-gstreamer1 python3-aiohttp gstreamer1 gstreamer1-plugins-base \
-        gstreamer1-plugins-good gstreamer1-plugins-bad-free libnice-gstreamer1 \
-        openssl iproute v4l-utils akmods mokutil
-    if ! rpm -q rpmfusion-free-release >/dev/null 2>&1; then
-        kagami_log 'Enabling RPM Fusion Free for the virtual camera driver'
-        sudo dnf install -y "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm"
+    kagami_install_dependencies "$running"
+    kagami_camera_module "$running"
+    if kagami_secure_boot; then :; else
+        status=$?
+        (( status == 10 )) || return "$status"
+        pending=1
     fi
-    # Keep an existing akmods key. Never replace it or disable Secure Boot.
-    sudo kmodgenca -a
-    sudo dnf install -y akmod-v4l2loopback v4l2loopback
-    kagami_prepare_camera_kernels || return 2
-    sudo systemctl enable akmods.service
-    kernel=$(kagami_select_kernel "$running") || {
-        kagami_fail 'No prepared installed Fedora kernel can run the camera.'; return 2;
-    }
-    if [[ $kernel != "$running" ]]; then
-        pending=1; kernel_pending=1
-        kagami_log "Running $running is not an installed supported Fedora kernel. Reboot into prepared kernel $kernel after installation."
-    fi
-    if LC_ALL=C mokutil --sb-state 2>/dev/null | grep -q 'SecureBoot enabled'; then
-        if ! sudo mokutil --test-key /etc/pki/akmods/certs/public_key.der >/dev/null 2>&1; then
-            kagami_log 'Secure Boot needs the akmods signing key. Set an enrollment password now; after reboot choose Enroll MOK and enter that password.'
-            if [[ -r /dev/tty ]]; then
-                # The desktop user opens their own terminal; stdin is the curl pipe.
-                # shellcheck disable=SC2024
-                sudo mokutil --import /etc/pki/akmods/certs/public_key.der < /dev/tty
-                pending=1; mok_pending=1
-            else
-                kagami_fail 'Run from an interactive terminal to enroll the Secure Boot key.'; return 2
-            fi
-        fi
-    fi
-    kagami_log "Downloading and building Kagami ($ref); first build may take several minutes"
+    kagami_log "Downloading Kagami ($ref)"
     source=$stage/source
     git init -q "$source"
     git -C "$source" remote add origin https://github.com/celestial-sora/kagami.git
-    git -C "$source" fetch --depth=1 origin "$ref"
+    git -C "$source" fetch --depth=1 origin "$ref" < /dev/null
     git -C "$source" checkout -q --detach FETCH_HEAD
     sha=$(git -C "$source" rev-parse HEAD)
-    version=$root/versions/$sha-$(uname -m)
-    # Cargo/build scripts run without sudo; no permanent root-running UI.
-    if [[ ! -x $version/bin/kagami-linux ]]; then
-        (cd "$source" && cargo build --release -p kagami-linux)
-    fi
-    number=$(kagami_number "$source" "$config/config.json")
-    local host_args=()
-    [[ -z ${KAGAMI_HOST:-} ]] || host_args=(--host "$KAGAMI_HOST")
-    network=$stage/network.json
-    python3 "$source/tools/install_config.py" --directory "$config" --device "/dev/video$number" "${host_args[@]}" > "$network"
-    kagami_log 'Installing the desktop app and camera setup service'
-    payload=$stage/payload
-    mkdir -p "$payload/bin" "$root/versions"
-    cp -a "$source/apps" "$source/tools" "$source/docs" "$source/README.md" "$source/LICENSE" "$payload/"
-    if [[ -x $version/bin/kagami-linux ]]; then
-        install -m 755 "$version/bin/kagami-linux" "$payload/bin/kagami-linux"
-    else
-        install -m 755 "$source/target/release/kagami-linux" "$payload/bin/kagami-linux"
-    fi
-    printf '%s\n' "$sha" > "$payload/VERSION"
-    if [[ ! -d $version ]]; then mv "$payload" "$version"; fi
-    python3 "$source/tools/install_launchers.py" --root "$root" --config "$config/config.json" --data "$data"
-    sudo install -D -m 755 "$source/packaging/fedora/kagami-camera-setup" /usr/local/libexec/kagami-camera-setup
-    sudo install -D -m 644 "$source/packaging/fedora/70-kagami-camera.rules" /etc/udev/rules.d/70-kagami-camera.rules
-    cat > "$stage/kagami-camera.service" <<UNIT
+    version=$root/versions/v2-$sha-$(uname -m)
+    kagami_log 'Building the pinned MiracleCast receiver (no root build)'
+    kagami_install_miraclecast "$source" "$stage"
+    [[ -z ${KAGAMI_INTERFACE:-} ]] || interface_args=(--interface "$KAGAMI_INTERFACE")
+    python3 "$source/tools/install_receiver.py" prepare --config "$config/receiver-install.json" "${interface_args[@]}" > "$stage/settings.json"
+    mapfile -t kagami_settings < <(python3 - "$stage/settings.json" <<'PY'
+import json, sys
+settings = json.load(open(sys.argv[1]))
+for key in ('output', 'source', 'interface'):
+    print(settings[key].removeprefix('/dev/video'))
+PY
+)
+    (( ${#kagami_settings[@]} == 3 )) || { kagami_fail 'Cannot read receiver settings.'; return 2; }
+    output=${kagami_settings[0]}; input=${kagami_settings[1]}; interface=${kagami_settings[2]}
+    kagami_log 'Installing root-owned helpers and boot camera service'
+    for helper in kagami-camera-setup kagami-receiver-camera-setup; do
+        sudo install -D -o root -g root -m 755 "$source/packaging/fedora/$helper" "/usr/local/libexec/$helper"
+    done
+    for helper in kagami-smartview-helper kagami-smartview-session; do
+        sudo install -D -o root -g root -m 755 "$source/packaging/ubuntu/$helper" "/usr/local/libexec/$helper"
+    done
+    sudo install -D -o root -g root -m 644 "$source/packaging/fedora/70-kagami-camera.rules" /etc/udev/rules.d/70-kagami-camera.rules
+    cat > "$stage/kagami-receiver-camera.service" <<UNIT
 [Unit]
-Description=Kagami V4L2 virtual camera
-Wants=akmods.service
-After=akmods.service systemd-udevd.service systemd-modules-load.service
+Description=Kagami receiver camera nodes
+After=systemd-udevd.service systemd-modules-load.service
 [Service]
 Type=oneshot
-ExecStart=/usr/local/libexec/kagami-camera-setup $number
+ExecStart=/usr/local/libexec/kagami-receiver-camera-setup $output $input
 RemainAfterExit=yes
 [Install]
 WantedBy=multi-user.target
 UNIT
-    sudo install -m 644 "$stage/kagami-camera.service" /etc/systemd/system/kagami-camera.service
+    sudo install -o root -g root -m 644 "$stage/kagami-receiver-camera.service" /etc/systemd/system/kagami-receiver-camera.service
     sudo udevadm control --reload-rules
     sudo systemctl daemon-reload
-    sudo systemctl enable kagami-camera.service
+    sudo systemctl enable kagami-receiver-camera.service
     if (( pending == 0 )); then
-        sudo systemctl restart kagami-camera.service || {
-            kagami_fail 'Virtual camera setup failed. Check Secure Boot/kernel compatibility with: journalctl -u kagami-camera.service'; return 2;
+        sudo systemctl restart kagami-receiver-camera.service || {
+            kagami_fail 'Camera setup failed. Check journalctl -u kagami-receiver-camera.service. Existing cameras were not unloaded.'; return 2;
         }
-        sudo udevadm trigger "/sys/class/video4linux/video$number"
+        sudo udevadm trigger --subsystem-match=video4linux
         sudo udevadm settle
-    fi
-    if systemctl is-active --quiet firewalld; then
-        local host subnet interface port udp_min udp_max zone rule protocol range
-        read -r host subnet interface port udp_min udp_max < <(python3 - "$network" <<'PY'
-import json, sys
-n=json.load(open(sys.argv[1]))
-print(n['host'], n['subnet'], n['interface'], n['port'], n['udp_min'], n['udp_max'])
+        PYTHONPATH="$source/apps/host" python3 - "/dev/video$output" "/dev/video$input" <<'PY'
+import sys
+from kagami_host.v4l2 import query_device
+for device in sys.argv[1:]:
+    query_device(device)
 PY
-)
-        zone=$(sudo firewall-cmd --get-zone-of-interface="$interface" || true)
-        if [[ -z $zone || $zone == 'no zone' ]]; then zone=$(sudo firewall-cmd --get-default-zone); fi
-        for protocol in tcp udp; do
-            range=$port
-            [[ $protocol == tcp ]] || range=$udp_min-$udp_max
-            rule="rule family=\"ipv4\" source address=\"$subnet\" destination address=\"$host\" port port=\"$range\" protocol=\"$protocol\" accept"
-            sudo firewall-cmd --zone="$zone" --permanent --add-rich-rule="$rule"
-            sudo firewall-cmd --zone="$zone" --add-rich-rule="$rule"
-        done
-        cp "$network" "$config/installer-network.json"
     fi
-    # Activate only a completed version. Previous versions/settings are retained.
+    if python3 "$source/tools/install_receiver.py" check --config "$config/receiver-install.json"; then status=0; else status=$?; fi
+    (( status == 0 || status == 10 )) || { kagami_fail 'Receiver software checks failed; previous app remains active.'; return 2; }
+    (( status != 10 )) || pending=1
+    mkdir -p "$root/versions"
+    if [[ ! -d $version ]]; then
+        mkdir "$stage/app-payload"
+        cp -a "$source/apps" "$source/tools" "$source/docs" "$source/README.md" "$source/LICENSE" "$stage/app-payload/"
+        printf '%s\n' "$sha" > "$stage/app-payload/VERSION"
+        mv "$stage/app-payload" "$version"
+    fi
+    # Keep previous app versions/config/CA and presets; replace the entry point.
     ln -s "$version" "$root/current.next.$$"
     mv -Tf "$root/current.next.$$" "$root/current"
-    kagami_log "Installed $sha. Open Kagami from your application menu."
-    printf 'Phone trust certificate: %s/tls/ca.pem\n' "$config"
-    printf 'Transfer only ca.pem to your phone and complete its one-time certificate trust setup.\n'
+    python3 "$source/tools/install_receiver.py" launchers --root "$root" --config "$config/receiver-install.json" --data "$data"
+    kagami_log "Installed Kagami V2 $sha. Open Kagami from your application menu."
+    printf 'Smart View adapter: %s. Camera output: /dev/video%s. Screen input: /dev/video%s.\n' "$interface" "$output" "$input"
+    printf 'CLI: %s/.local/bin/kagami smartview-doctor\n' "$HOME"
+    printf 'Samsung Smart View is experimental; real Galaxy/OBS verification remains pending.\n'
     if (( pending )); then
-        if (( kernel_pending )); then
-            printf 'Camera setup pending: reboot into %s, then open Kagami. The boot service will create the camera; no reinstall is needed.\n' "$kernel"
-        fi
-        if (( mok_pending )); then
-            printf 'Secure Boot setup pending: on reboot, confirm Enroll MOK with your enrollment password.\n'
-        fi
+        printf 'Installation complete; prerequisites pending (exit 10). Complete MOK enrollment/reboot if requested, or use a P2P-capable Wi-Fi adapter.\n'
         return 10
     fi
-    PYTHONPATH="$version/apps/host" python3 -m kagami_host doctor --config "$config/config.json" || {
-        kagami_fail 'App installed, but diagnostics need attention. Review the report above before starting a stream.'; return 2;
-    }
-    kagami_log 'Linux setup checks passed. Phone/OBS hardware streaming still needs verification.'
+    kagami_log 'Software/camera checks passed. In Kagami confirm the selected adapter may disconnect, then Start; on Galaxy select Smart View → Kagami.'
 }
-
-# A pipe runs main; sourcing this file for installer tests only defines functions.
+# A pipe runs main; sourcing this script for tests only defines functions.
 if [[ -z ${BASH_SOURCE[0]:-} || ${BASH_SOURCE[0]} == "$0" ]]; then kagami_main "$@"; fi

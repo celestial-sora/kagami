@@ -28,13 +28,13 @@ rpm() { printf '%s\\n' "$KAGAMI_TEST_INSTALLED"; }
 uname() { printf 'x86_64\\n'; }
 kagami_kernel_ready() { [[ :$KAGAMI_TEST_READY: == *":$1:"* ]]; }
 kagami_select_kernel "$2"
-''', "kernel-test", str(ROOT / "install.sh"), running],
+''', "kernel-test", str(ROOT / "install-v1.sh"), running],
                           env=env, capture_output=True, text=True)
 
 
 def installer_shell(script, **variables):
     return subprocess.run(["bash", "-c", 'source "$1"\n' + script,
-                           "installer-test", str(ROOT / "install.sh")],
+                           "installer-test", str(ROOT / "install-v1.sh")],
                           env={**os.environ, **variables}, capture_output=True, text=True)
 
 
@@ -229,7 +229,7 @@ kagami_prepare_camera_kernels
             fake.write_text("#!/bin/sh\nexit 99\n")
             fake.chmod(0o755)
             env = {**os.environ, "PATH": directory + os.pathsep + os.environ["PATH"]}
-            result = subprocess.run(["bash", "-s", "--", "--dry-run"], input=(ROOT / "install.sh").read_text(), env=env, capture_output=True, text=True)
+            result = subprocess.run(["bash", "-s", "--", "--dry-run"], input=(ROOT / "install-v1.sh").read_text(), env=env, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("RPM Fusion Free", result.stdout)
             self.assertIn("Secure Boot", result.stdout)

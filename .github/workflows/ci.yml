@@ -1,7 +1,7 @@
 name: Checks
 on:
   push:
-    branches: [main, feat/receiver-first-architecture]
+    branches: [main, feat/receiver-first-architecture, feat/ubuntu-curl-installer]
     paths-ignore:
       - 'docs/**'
       - 'README.md'
@@ -30,7 +30,7 @@ jobs:
       - run: python -m compileall -q apps/host apps/receiver tools
       - run: bash -n tools/test-pattern.sh
       - run: |
-          for script in install.sh packaging/fedora/kagami-camera-setup packaging/fedora/kagami-receiver-camera-setup tools/run-receiver.sh; do
+          for script in install.sh install-v1.sh tools/build-miraclecast.sh packaging/fedora/kagami-camera-setup packaging/fedora/kagami-receiver-camera-setup tools/run-receiver.sh; do
             bash -n "$script"
           done
   browser:
@@ -51,10 +51,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
       - run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libadwaita-1-dev pkg-config shellcheck desktop-file-utils
-      - run: shellcheck install.sh packaging/fedora/kagami-camera-setup packaging/fedora/kagami-receiver-camera-setup packaging/ubuntu/kagami-smartview-session tools/test-pattern.sh tools/run-receiver.sh
+      - run: shellcheck install.sh install-v1.sh tools/build-miraclecast.sh packaging/fedora/kagami-camera-setup packaging/fedora/kagami-receiver-camera-setup packaging/ubuntu/kagami-smartview-session tools/test-pattern.sh tools/run-receiver.sh
       - run: |
           python3 tools/install_launchers.py --root /tmp/kagami --config /tmp/kagami/config.json --data /tmp/kagami-desktop
           desktop-file-validate /tmp/kagami-desktop/applications/io.kagami.Host.desktop
+          python3 tools/install_receiver.py prepare --config /tmp/kagami-v2/settings.json --interface wlan2
+          python3 tools/install_receiver.py launchers --root /tmp/kagami-v2 --config /tmp/kagami-v2/settings.json --data /tmp/kagami-v2-desktop
+          desktop-file-validate /tmp/kagami-v2-desktop/applications/io.kagami.Host.desktop
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo build --release -p kagami-linux
   media-api:
@@ -77,6 +80,12 @@ jobs:
           sudo apt-get install -y python3-gi python3-gi-cairo python3-gst-1.0 gir1.2-gtk-4.0 \
             gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
             gstreamer1.0-plugins-ugly gstreamer1.0-libav xvfb
+      - run: |
+          sudo apt-get install -y build-essential meson ninja-build pkg-config libglib2.0-dev libreadline-dev libudev-dev libsystemd-dev
+          bash tools/build-miraclecast.sh /tmp/kagami-miracle-source /tmp/kagami-miracle-stage
+          /tmp/kagami-miracle-stage/usr/local/bin/miracle-wifid --help
+          /tmp/kagami-miracle-stage/usr/local/bin/miracle-sinkctl --help
+          test -f /tmp/kagami-miracle-stage/etc/dbus-1/system.d/org.freedesktop.miracle.conf
       - run: G_DEBUG=fatal-criticals KAGAMI_TEST_GST=1 /usr/bin/python3 -m unittest discover -s tests -p test_receiver.py -v
       - run: G_DEBUG=fatal-criticals xvfb-run -a /usr/bin/python3 tools/check_receiver_desktop.py
       - run: G_DEBUG=fatal-criticals KAGAMI_TEST_GST=1 /usr/bin/python3 -m unittest discover -s tests -p test_smartview.py -v

@@ -12,13 +12,13 @@ The adapter verifies scrcpy 3.0+ and installed help flags. Documented V4L2 scree
 
 Output defaults: input `/dev/video11`, output `/dev/video10`, 1280×720 at 30 FPS. Framing changes rebuild only the input processing branch; the writer remains alive. Stop/close/SIGTERM releases owned children. Disconnect produces black output, not background capture or implicit network reconnect. Captured orientation is locked; stop/rotate/restart and use the matching-size preset.
 
-V1 remains intact in `apps/host`, `apps/web-client` and `apps/linux`, with [README_V1](../README_V1.md). `install.sh` still installs V1; V2 setup is documented in [receiver setup](receiver-setup.md). The shared one-device Fedora helper now accepts a strictly allowed optional label; the V2 helper preflights two different named slots. Do not unload a running camera module.
+V1 remains intact in `apps/host`, `apps/web-client` and `apps/linux`, with [README_V1](../README_V1.md). `install.sh` now installs V2 on Ubuntu in one curl command, including pinned MiracleCast, helpers and camera service. The historical Fedora installer is `install-v1.sh`; see [installation](installation.md). The shared one-device Fedora helper now accepts a strictly allowed optional label; the V2 helper preflights two different named slots. Do not unload a running camera module.
 
 ## Validation / next work
 
 Read current [validation](validation.md); synthetic raw frames and GTK tests do not close hardware acceptance. The authoring environment has no Android/Fedora/V4L2 hardware. Next work is the explicit [hardware checklist](receiver-testing.md): Samsung Camera and TikTok separately, OBS plus a second V4L2 consumer, cable disconnect/reconnect, Stop/exit, orientation and 15-minute stability. Then test authorized Wi-Fi separately and record measured latency.
 
-Smart View/Miracast has no verified sink; Google Cast is research-only. Automatic reconnect/orientation handling, direct-camera mode, final Rust media migration and V2 curl packaging are deferred.
+Smart View/Miracast has an integrated experimental sink with no Galaxy acceptance; Google Cast is research-only. Automatic reconnect/orientation handling, direct-camera mode, final Rust media migration are deferred. V2 curl packaging was added at the maintainer’s explicit request; fresh-host DKMS/Secure Boot acceptance remains pending.
 
 All legacy CI jobs remain; the receiver job executes raw-frame tests and a real GTK smoke check under Xvfb. Pushes to `feat/receiver-first-architecture` run checks without a PR. Preserve the GI/WebRTC ownership regression check when touching V1 media.
 

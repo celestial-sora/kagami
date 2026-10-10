@@ -17,7 +17,7 @@
 - Captured orientation is locked; crop settings are keyed by captured size and user-supplied app label. Do not promise automatic rotation/reconnect until implemented and tested.
 - Smart View/Miracast is unverified research; Google Cast is research-only. ADB Wi-Fi requires explicit pairing/connection on a trusted private network and must never silently replace USB.
 - Run legacy host/installer checks and receiver contract tests. Opt-in KAGAMI_TEST_GST=1 tests use real GStreamer with synthetic input; GTK smoke uses Xvfb. None proves Fedora/Android/OBS hardware acceptance.
-- install.sh remains V1. V2 curl packaging is deferred until hardware verification and dependable install paths. Use docs/receiver-setup.md for source setup.
+- The maintainer explicitly requests one-command curl installation now. install.sh installs V2 on Ubuntu 24.04/26.04; historical Fedora V1 installer is install-v1.sh. Keep experimental hardware status explicit; preserve settings and never silently disconnect networking during installation. See docs/installation.md.
 - The maintainer requests no PR for this migration; integrate after feature-branch CI and push main once. Contributor name requested: celestail-sora (or celestail-duck); GitHub account/repository owner is celestial-sora.
 
 ## Retained V1 engineering context

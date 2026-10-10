@@ -68,7 +68,7 @@ def main():
             return 0 if all(c["ok"] for c in checks) else 2
         elif args.action == "desktop":
             from .desktop import run
-            return run(config)
+            return run(config, args.interface)
         else:
             from .controller import Receiver
             from .model import Crop

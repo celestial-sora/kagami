@@ -18,11 +18,11 @@ The latest executable baseline Actions run was successful: [Checks at 93399aa](h
 - Explicit USB/Wi-Fi selection and manual reconnect; lock the captured orientation to avoid V4L2 resolution changes. Crop settings are normalized and keyed by device/app-label/captured size. The app label is user supplied, not read from personal Android app data.
 - Keep one camera writer alive with black output after disconnect; bounded queues/latest preview storage; stop/exit reaps the owned scrcpy process group. Device identity guards reject physical cameras, and locks prevent multiple Kagami receivers owning the same nodes.
 - Two-device Fedora provisioning builds on the existing one-device helper; V1 callers remain compatible. No module unload, silent network changes, root GUI or automatic Android permission grants.
-- Preserve V1 code, tests, installer and README_V1.md. Existing handoff/plan are archived as `*-v1.md`; the new plan follows the supplied Architecture v2, preserved verbatim in `architecture-v2.md`.
+- Preserve V1 code, tests, archived install-v1.sh and README_V1.md. Existing handoff/plan are archived as `*-v1.md`; the new plan follows the supplied Architecture v2, preserved verbatim in `architecture-v2.md`.
 - Add headless contract tests, opt-in real GStreamer synthetic-frame tests, GTK/Xvfb smoke check and a receiver CI job. Keep all legacy CI jobs. Feature-branch pushes run CI without requiring a PR.
 
 ## Remaining acceptance
 
 This environment is Ubuntu 26.04, Python 3.14 with system GTK4/GStreamer 1.28.2, plus a Python 3.12 test runtime. There is no physical Android phone, Fedora host or `/dev/video*`. Samsung preview, TikTok effects, actual loopback writes, OBS/Discord, USB/Wi-Fi stability, Fedora setup, kernel switching and measured glass-to-glass latency remain unverified.
 
-Smart View/Miracast is experimental research with no working sink integrated. Google Cast is research-only. Direct camera capture, automatic physical-orientation changes, hardware acceleration, automatic reconnect and a V2 curl installer are deferred. Do not advertise these as supported.
+Smart View/Miracast has an integrated experimental MiracleCast sink; Galaxy interoperability is unverified. Google Cast is research-only. Direct camera capture, automatic physical-orientation changes, hardware acceleration, automatic reconnect are deferred. The maintainer explicitly requested V2 curl installation: install.sh now targets the Ubuntu native receiver; physical installation acceptance is pending. Do not advertise these as supported.

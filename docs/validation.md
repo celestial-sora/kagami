@@ -1,3 +1,12 @@
+# Ubuntu one-command installer validation · 2026-10-10
+
+The maintainer explicitly requested replacing the default installer now. `install.sh` installs V2 on Ubuntu 24.04/26.04; `install-v1.sh` preserves the previous Fedora implementation. It builds pinned MiracleCast unprivileged, installs fixed root-owned helpers/policy/license, provisions two named camera nodes and replaces the desktop/CLI launcher. Existing V1 configuration and receiver presets are preserved.
+
+- Installer tests cover no-change piped dry run, exact kernel module verification, failed builds, Secure Boot/enrolled/missing-key paths, camera slot selection including dangling symlinks, settings preservation and literal launcher paths/arguments.
+- A complete shell orchestration test uses fake package/root/network/build commands and temporary user directories. It verifies successful activation, no-P2P and MOK pending status, software failure preserving the previous active app, boot service behavior and temporary-file cleanup. It does not perform a privileged installation.
+- Real receiver synthetic-frame tests and GTK/Xvfb smoke passed after the launcher/adapter changes. The CI receiver job builds and stages pinned MiracleCast on Ubuntu 24.04; consult its actual run result before claiming build success.
+- **Still unverified:** fresh-host apt/DKMS setup, enabled Secure Boot enrollment/loading, real V4L2 provisioning on this Ubuntu host, Galaxy discovery/negotiation, broker network restoration and OBS streaming. The authoring adapter still lacks advertised P2P client/GO. No host network or system package/module settings were changed during this installer batch.
+
 # V2 validation · 2026-10-10
 
 Current target: **Ubuntu + Samsung Smart View**. Status: experimental source prototype; hardware acceptance remains open.

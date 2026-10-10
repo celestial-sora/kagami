@@ -6,7 +6,17 @@ Turn the **screen of your Android phone** into a real Linux virtual camera. Open
 
 ## Run V2
 
-Start with [Ubuntu Smart View setup](docs/smartview-ubuntu.md), including P2P hardware checks and **two** Kagami loopbacks. USB/ADB fallback setup remains in [receiver setup](docs/receiver-setup.md). Then, as your desktop user:
+Use [Ubuntu installation](docs/installation.md) for the default Smart View workflow. USB/ADB fallback setup remains in [receiver setup](docs/receiver-setup.md).
+
+Install the new receiver with one command on Ubuntu 24.04 or 26.04:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/celestial-sora/kagami/main/install.sh | bash
+```
+
+Open **Kagami** from your application menu. Dependencies, pinned MiracleCast and camera setup are automatic; sudo authentication and any Secure Boot enrollment still require your action. See [installation](docs/installation.md) for pending prerequisites, updates and paths.
+
+For source/developer diagnostics:
 
 ```bash
 bash tools/run-receiver.sh smartview-doctor --interface wlo1
@@ -53,7 +63,7 @@ xvfb-run -a python3 tools/check_receiver_desktop.py
 
 CI keeps V1 host/browser/native/media checks and adds real synthetic raw-frame GStreamer and GTK smoke checks. These do not prove a real phone, kernel camera output or OBS. Follow [hardware testing](docs/receiver-testing.md) and [validation evidence](docs/validation.md).
 
-The original browser bridge and its existing curl installer remain available in [V1 documentation](README_V1.md); `install.sh` still installs **V1**, not V2. The V2 one-command installer is deferred until the hardware acceptance and install paths are dependable.
+The original browser bridge remains available in [V1 documentation](README_V1.md) with `install-v1.sh`. The default `install.sh` now installs **V2 on Ubuntu**. Smart View hardware acceptance remains open.
 
 Read [Architecture v2](docs/architecture-v2.md), [implementation plan](docs/implementation-plan.md), [migration audit](docs/receiver-audit.md) and [handoff](docs/handoff.md).
 

@@ -7,10 +7,10 @@ A local phone camera bridge for Linux. Your phone sends video; your computer exp
 ## Install on Fedora
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/celestial-sora/kagami/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/celestial-sora/kagami/main/install-v1.sh | bash
 ```
 
-Run as your desktop user. The installer handles dependencies, virtual-camera setup, native build, configuration, TLS and an application-menu launcher. See [installation](docs/installation.md) for Secure Boot enrollment, updates and exact scope. Android certificate trust and camera permission remain first-time phone actions.
+Run as your desktop user. The installer handles dependencies, virtual-camera setup, native build, configuration, TLS and an application-menu launcher. See [installation](docs/installation-v1.md) for Secure Boot enrollment, updates and exact scope. Android certificate trust and camera permission remain first-time phone actions.
 
 ## Manual developer setup
 

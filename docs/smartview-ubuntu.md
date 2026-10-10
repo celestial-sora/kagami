@@ -4,6 +4,16 @@ The maintainer changed the primary target from Fedora/USB to **Ubuntu + Samsung 
 
 **Status: experimental integrated receiver prototype, not Galaxy-verified.** Synthetic RTP/MPEG-TS/H.264 decoding, framing and GTK checks pass. Actual P2P discovery, negotiation and Samsung Camera surfaces must still be tested with a Galaxy.
 
+## One-command installation
+
+On Ubuntu 24.04 or 26.04 run as your desktop user:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/celestial-sora/kagami/main/install.sh | bash
+```
+
+The installer handles the dependencies, pinned MiracleCast build, root-owned helpers, camera service and new desktop launcher described below. See [installation](installation.md) for Secure Boot and hardware pending states. The remaining commands are manual/developer setup.
+
 ## Current machine blocker
 
 On this Ubuntu 26.04 authoring machine, `wlo1` uses `rtw88_8821ce`. `iw phy phy0 info` advertises managed/AP/monitor but **no P2P-client/P2P-GO modes**. Other mentions of P2P under TX/RX capabilities do not prove P2P interface support. Kagami rejects this adapter rather than claiming Smart View is ready. A P2P-capable adapter/driver is necessary. MiracleCast and decoder plugins are also not installed system-wide here.
@@ -27,7 +37,7 @@ sudo apt update
 sudo apt install python3-gi python3-gi-cairo python3-cairo python3-gst-1.0 \
   gir1.2-gtk-4.0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
   gstreamer1.0-plugins-bad gstreamer1.0-libav iw network-manager wpasupplicant \
-  policykit-1 v4l-utils v4l2loopback-dkms linux-headers-generic
+  pkexec polkitd v4l-utils v4l2loopback-dkms v4l2loopback-utils "linux-headers-$(uname -r)"
 ```
 
 GTK4 4.8+ and GStreamer 1.22+ are required. Install headers matching the actual running kernel when it is not Ubuntu's generic kernel. Secure Boot may require the standard DKMS signing/MOK enrollment step; keep it enabled and complete enrollment manually.

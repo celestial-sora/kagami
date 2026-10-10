@@ -1,3 +1,5 @@
+> **Installer update:** the maintainer explicitly requested one-command `curl … | bash` installation. `install.sh` now targets V2 on Ubuntu; historical Fedora V1 setup is `install-v1.sh`. Hardware acceptance remains open.
+
 > **Maintainer update:** primary target is now **Ubuntu + Samsung Smart View**, ahead of USB. See [Smart View setup/status](smartview-ubuntu.md). The MiracleCast receiver prototype is integrated but physical Galaxy/P2P acceptance remains open; USB is a fallback. Earlier Fedora/USB rollout references below are historical context.
 
 # Kagami V2 implementation plan

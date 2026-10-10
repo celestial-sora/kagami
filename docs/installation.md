@@ -1,78 +1,67 @@
-> This document describes the retained **V1 browser bridge installer**. For the new screen-mirroring workflow use [V2 receiver setup](receiver-setup.md); `install.sh` has not yet been replaced.
+# One-command Ubuntu installation
 
-# One-command Fedora installation
-
-For DNF-based Fedora Workstation, run as your ordinary desktop user:
+Run in a terminal as your ordinary desktop user on Ubuntu 24.04 or 26.04:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/celestial-sora/kagami/main/install.sh | bash
 ```
 
-The installer requests your sudo password for system setup. It installs GTK/Rust/GStreamer/Python packages, enables **RPM Fusion Free** when needed, installs its `akmod-v4l2loopback` and userspace tools, builds Kagami without root, prepares local HTTPS, and adds **Kagami** to your application menu. The first source build can take several minutes; Internet is needed for installation and updates, while streaming stays local.
+This installs **Kagami V2**, replacing the normal Kagami application-menu/CLI entry point with the native screen receiver. Samsung Smart View is the default, experimental transport. Previous V1 app versions, HTTPS config/CA and receiver presets are preserved. The retained Fedora browser bridge has a separate [V1 installer](installation-v1.md).
 
-It supports DNF-based Fedora, including KDE with GTK libraries. Fedora Atomic/Silverblue, containers, other distributions and machines without administrative access receive an explanation. The installation workflow is source-tested; an actual fresh Fedora installation remains part of the hardware acceptance gate.
+The command requests your sudo password, installs GTK4/Python/GStreamer, Wi-Fi Direct tools, matching running-kernel headers and the DKMS virtual camera driver. It downloads Kagami and builds [MiracleCast](https://github.com/albfan/miraclecast) at pinned commit `0b7f1f1f6586dc65ff480f3cda5c2170a70aa020` as your ordinary user. Only fixed binaries, D-Bus policy, network helpers and camera service are installed as root. MiracleCast's license is installed with its version record. No Rust build or phone app is required for Smart View.
+
+Internet is needed for installation/updates. Installation leaves Wi-Fi connected; it does not start the receiver, alter global networking, grant passwordless sudo, or open generic firewall ports. During streaming the selected adapter is handed to MiracleCast only after you confirm in Kagami. Custom firewalls may need interface-scoped Miracast rules after the actual P2P interface is known.
 
 ## After installation
 
-1. Open **Kagami** from the application menu and press **Start host**.
-2. Transfer only the printed `ca.pem` file to Android through a trusted local channel and import the CA. See [trusted HTTPS setup](pairing-and-tls.md). The QR code alone cannot grant certificate trust.
-3. Scan Kagami's QR, press **Start camera**, and grant the phone's camera permission.
-4. In OBS select **Video Capture Device (V4L2) → Kagami Virtual Camera**.
+1. Open **Kagami** from the application menu. The installer selects a Wi-Fi adapter advertising P2P client/GO when one is present; the interface can be changed in the app.
+2. Click **Check Smart View**. Confirm the selected adapter may disconnect, then **Start**. Polkit may request authentication for its fixed network helper.
+3. On Galaxy choose **Smart View → Kagami**, approve the phone prompt, and open Samsung Camera or the app to mirror.
+4. Drag/apply a crop and select **Kagami Virtual Camera** in OBS. The default output is `/dev/video10`; `/dev/video11` is internal screen input. Occupied camera numbers are skipped on first installation, while identified Kagami nodes are reused.
+5. Click **Stop** to end reception and restore the adapter's prior network management.
 
-The host installer cannot grant Android certificate trust or camera permission on your behalf. Those remain first-time phone actions.
+**Real Galaxy discovery, P2P negotiation, network restoration and OBS streaming remain unverified.** Software tests and a successful installation do not prove phone interoperability. See [current Smart View blockers](smartview-ubuntu.md) and [validation](validation.md).
 
-## Secure Boot
+The authoring host's `rtw88_8821ce` driver advertises no P2P-client/P2P-GO. The software can be installed, but that adapter cannot pass Kagami's Smart View preflight. A compatible adapter/driver is required; a separate adapter also allows the primary adapter to keep providing Internet. Do not choose a dongle only by a Wi-Fi generation/marketing label: verify its actual chipset, hardware revision and Linux P2P modes.
 
-The installer preserves the existing akmods signing key, or creates one before building the camera module. When Secure Boot is enabled and this key is not enrolled, it requests an enrollment password using `mokutil`. Reboot, choose **Enroll MOK**, and confirm using that password. The camera setup service runs after reboot; no second installation command is required for that enrollment step.
+USB/ADB fallback remains available in the app but requires a separate authorized ADB/scrcpy 3.0+ installation. It is not needed by this Smart View installer.
 
-In this case it reports **camera setup pending** and exits with code 10 rather than claiming a ready camera. It never disables Secure Boot or certificate verification. Unsigned previously installed modules, package build errors or denied permissions report an actionable failure. See the distribution's `/usr/share/doc/akmods/README.secureboot` and [RPM Fusion guidance](https://rpmfusion.org/Howto/Secure%20Boot).
+## Secure Boot and pending prerequisites
 
-## Multiple kernel versions
+Matching headers for the running kernel are required. DKMS builds the driver and the installer verifies module `vermagic`. Future kernel updates use Ubuntu's normal DKMS package hooks. A custom kernel without matching repository headers or incompatible driver API causes a visible failure; the installer does not change boot defaults or remove kernels.
 
-The virtual camera driver is compiled separately for each installed Fedora `kernel-core` version of the host architecture. The installer obtains that kernel's exact `kernel-devel` package, builds its v4l2loopback module through RPM Fusion akmods, and verifies the module's `vermagic` matches the requested kernel. Kagami's application/configuration can be reused when switching between those kernels.
+With Secure Boot enabled, Ubuntu/DKMS signing may require a MOK enrollment password. The installer requests enrollment using the terminal if the signing certificate is not already enrolled. Reboot and choose **Enroll MOK**, confirming with the password you set. The enabled camera service will create the named nodes after reboot; no additional manual helper commands are needed. Secure Boot is never disabled.
 
-Fedora repositories often retain only the latest kernel development packages. If an installed older version is unavailable there, the installer tries the **signed Fedora Koji archive**, using the version, release, architecture and signing key of that installed kernel. DNF signature checking is explicitly enabled for this direct RPM URL. If signed development files or a compatible driver cannot be prepared for a kernel, installation reports that exact kernel and fails visibly.
-
-Exact development-package transactions preserve installed versions without changing your global DNF settings. The installer keeps boot defaults and existing kernels, and starts the camera on the running kernel once its module is prepared. A reboot is still needed for pending Secure Boot enrollment, or when the running kernel is outside the installed standard Fedora kernel inventory; those cases print the required action and exit with code **10**.
-
-For subsequent kernel updates, RPM Fusion's existing `95-akmodsposttrans.install` hook invokes `akmods@<kernel>.service`. Its package dependencies provide matching development files, and the enabled `akmods.service` can build at boot before Kagami's camera service starts. No extra Kagami download/build daemon is added. Keep the kernel/development packages together when updating; Internet is needed for package installation, while an already prepared camera stays local at runtime.
-
-Automatic preparation covers standard Fedora `kernel-core` packages. Custom/debug/real-time kernels require their own matching development packages and driver setup. The driver must support the kernel API; a successful source test or build for one version does not prove compatibility with every future kernel.
+Exit status **0** means software/camera prerequisite checks passed; it does not mean a Galaxy was tested. **10** means the application was installed but MOK enrollment/reboot or P2P hardware is pending. **2** means setup or required software checks failed. Package/build commands can also propagate their own failure status. Read the preceding report for the specific missing prerequisite.
 
 ## Updates and paths
 
-Run the same curl command again to update. The current Git SHA and architecture identify an installed version; an already built version is reused. The installer preserves config, capture settings and the existing CA. It retains previous app versions, and switches the active version after setup succeeds.
+Run the same curl command to update. The application is versioned by Git SHA/architecture and activated after software checks. Installation settings and explicitly saved crop presets are preserved. Re-running currently rebuilds pinned MiracleCast in a fresh staging directory.
 
-|Item|Default path|
+| Item | Default path |
 |---|---|
-|App versions|`~/.local/share/kagami/versions/`|
-|Active app|`~/.local/share/kagami/current`|
-|Launcher|`~/.local/bin/kagami`|
-|Desktop entry|`~/.local/share/applications/io.kagami.Host.desktop`|
-|Configuration|`~/.config/kagami/config.json`|
-|TLS files|`~/.config/kagami/tls/`|
-|Root camera helper|`/usr/local/libexec/kagami-camera-setup`|
-|Camera boot service|`/etc/systemd/system/kagami-camera.service`|
-|Camera device ACL rule|`/etc/udev/rules.d/70-kagami-camera.rules`|
+| App versions / active version | `~/.local/share/kagami/versions/v2-…` / `current` |
+| CLI / desktop launcher | `~/.local/bin/kagami` / `~/.local/share/applications/io.kagami.Host.desktop` |
+| Installation settings | `~/.config/kagami/receiver-install.json` |
+| Crop presets | `~/.config/kagami/receiver-presets.json` |
+| Fixed root helpers | `/usr/local/libexec/kagami-{camera-setup,receiver-camera-setup,smartview-helper,smartview-session}` |
+| Camera boot service | `/etc/systemd/system/kagami-receiver-camera.service` |
+| Camera ACL rule | `/etc/udev/rules.d/70-kagami-camera.rules` |
+| MiracleCast binaries / D-Bus policy | `/usr/local/bin/miracle-{wifid,sinkctl,dhcp}` / `/etc/dbus-1/system.d/org.freedesktop.miracle.conf` |
+| MiracleCast license / pinned version | `/usr/local/share/doc/kagami-miraclecast/` |
 
-`XDG_DATA_HOME` and `XDG_CONFIG_HOME` are honored. No GUI or media process runs as root; the boot helper only creates/reuses the named loopback and never unloads another device. The active desktop session receives device access through `uaccess`.
+`XDG_DATA_HOME` and `XDG_CONFIG_HOME` are honored. The CLI's full path works even when `~/.local/bin` is not in PATH. Saved installation settings initialize the launcher; per-launch flags override them. Stop an already running V1/V2 app before opening the newly installed version: an update does not kill a running screen receiver.
 
-Auto-configuration prefers the default private LAN interface, ignores container/VPN addresses, and includes the currently available LAN/USB IPs in the initial certificate. To choose a specific currently attached address on first install:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/celestial-sora/kagami/main/install.sh | KAGAMI_HOST=192.168.42.100 bash
-```
-
-Existing configurations using an unavailable address or a certificate without the matching IP are preserved and rejected. Address migration/certificate renewal is still a prototype limitation; follow [TLS](pairing-and-tls.md) and [USB setup](usb-tethering.md) before changing that configuration.
-
-If firewalld is running, the installer adds rules in the selected interface's zone, restricted to its private subnet **and configured destination IP**: TCP HTTPS (default 8443) and bounded ICE ports (default UDP 50000–50100). It does not reload unrelated runtime firewall rules, alter routing, or enable Internet port forwarding. On a custom firewall, apply the equivalent local rules yourself. USB networking must use its own reachable address and subnet.
-
-Inspect the setup plan without changes:
+Inspect the plan without changes:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/celestial-sora/kagami/main/install.sh | bash -s -- --dry-run
 ```
 
-`KAGAMI_REF` on the `bash` side selects a branch, tag or Git commit for repeatable installs. See [validation](validation.md) for exactly what was tested and [manual Fedora setup](fedora-setup.md) for the individual commands.
+Select an adapter explicitly during install (replace `wlan2` with an existing interface):
 
-Package sources: [RPM Fusion v4l2loopback packaging](https://github.com/rpmfusion/v4l2loopback-kmod), [Fedora RPM Fusion setup](https://docs.fedoraproject.org/en-US/quick-docs/rpmfusion-setup/), [GStreamer ICE port properties](https://github.com/GStreamer/gstreamer/blob/main/subprojects/gst-plugins-bad/gst-libs/gst/webrtc/ice.c).
+```bash
+curl -fsSL https://raw.githubusercontent.com/celestial-sora/kagami/main/install.sh | KAGAMI_INTERFACE=wlan2 bash
+```
+
+`KAGAMI_REF` on the `bash` side selects a branch, tag or commit. See [source setup](smartview-ubuntu.md) for manual/developer steps.
