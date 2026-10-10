@@ -1,3 +1,9 @@
+# Mockup desktop UI · 2026-10-10
+
+The native GTK4 desktop now follows the supplied purple Kagami camera mockup: AirPlay/Smart View source cards, connection status, stacked camera settings and preview options, a large source/crop preview and three-step usage panel. Start/Stop stay in the header. USB/ADB, receiver diagnostics, explicit adapter consent, framing and presets remain under Connection setup & framing controls; the processed camera preview has its own expander. The gear opens the setup controls. Mirror explicitly affects preview/output through the existing pipeline. Guide/safe-area switches are display overlays and do not modify camera pixels. The disconnected preview stays an honest empty state, and live source pixels replace it; no mock phone image or wallpaper is shipped. Existing approved app/launcher icons and saved preferences are preserved. Contributor: celestail-sora.
+
+Local validation: all 68 contracts including opt-in synthetic GStreamer checks pass with fatal criticals, GTK/Xvfb checks pass, ShellCheck and diff checks pass. GTK checks cover source-card selection, overlays, saved settings/reopen, retained Start framing and Stop/close, with no real capture or network changes. The rendered window was visually inspected at 1360×1040 and the header remains visible at the smaller smoke-test size. Feature CI remains pending before main integration. Physical phone/OBS acceptance is unchanged by these UI checks.
+
 # Current handoff · 2026-10-10
 
 Ubuntu native GTK4 receiver in `apps/receiver/kagami_receiver`: Samsung Smart View, AirPlay, USB and authorized ADB Wi-Fi feed a shared crop/rotation/mirror/fit/FPS pipeline and persistent real V4L2 camera output. The maintainer requests direct main integration after feature CI, no PR, contributor celestail-sora, and one-command curl installation.

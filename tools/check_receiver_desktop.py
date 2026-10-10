@@ -28,7 +28,14 @@ def activate(application):
             assert window.mode.get_selected() == 1
             assert window.start.get_label() == "Start AirPlay"
             assert window.start.get_parent().get_parent() == window.get_child()
-            assert window.status.get_parent() == window.get_child()
+            assert window.status.get_parent().has_css_class("status-panel")
+            assert window.source_cards[0][0].has_css_class("selected")
+            window.source_cards[1][0].emit("clicked")
+            assert window.mode.get_selected() == 0
+            assert window.source_cards[1][0].has_css_class("selected")
+            window.source_cards[0][0].emit("clicked")
+            window.guide.set_active(True)
+            window.safe_area.set_active(True)
             visible, bounds = window.start.compute_bounds(window)
             assert visible and bounds.get_y() >= 0
             assert bounds.get_y() + bounds.get_height() <= window.get_height()
@@ -92,7 +99,7 @@ def activate(application):
             window.allow_disconnect.set_active(True)
             window.code.set_text("123456")
         except Exception as exc:
-            errors.append(str(exc))
+            errors.append(repr(exc))
         def check_autosave():
             checks_ran.append(True)
             try:
@@ -108,7 +115,7 @@ def activate(application):
                 restored.close_window(restored)
                 restored.destroy()
             except Exception as exc:
-                errors.append("Autosave: " + str(exc))
+                errors.append("Autosave: " + repr(exc))
             window.close()
             return GLib.SOURCE_REMOVE
         GLib.timeout_add(600, check_autosave)
