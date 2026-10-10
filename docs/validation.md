@@ -1,3 +1,11 @@
+# AirPlay static-screen lifecycle correction · 2026-10-10
+
+- The maintainer reports a static iPad screen eventually going black, while gaming remains connected for over ten minutes. Actual receiver logs show the previous four-second stale-video error; the controller also replaced media with slate after three seconds. These timers incorrectly equated missing changed frames with disconnect.
+- AirPlay now retains the last processed frame at the selected camera FPS. Its owned patched UxPlay reports explicit RTP teardown, video TCP EOF (including a partial packet), final control-connection close, reset and the existing missed-feedback watchdog using fixed, immediately flushed events. Backend help advertises the required event capability; unpatched backends are rejected with installer guidance.
+- All **59** contracts/media tests pass locally with fatal criticals. A real synthetic camera consumer reads ten identical generated frames despite a 600-second-old input timestamp, then reads black after protocol disconnect. Other transports retain their previous stale-frame behavior.
+- The native check compiles actual UxPlay callbacks and links the real built libraries. It advances 600 logical one-second ticks with client feedback every two ticks, without additional media, then verifies teardown, control EOF, reset, lost feedback and actual loopback video TCP EOF. A fully buffered stdout pipe receives disconnect promptly. This is simulated protocol time, not ten minutes of wall-clock Apple casting.
+- Actual pinned-backend build, RTP timestamp regression, Avahi advertisement/owned teardown, GTK/Xvfb, ShellCheck and compilation pass locally. Long static-screen acceptance on the physical iPad and further devices/reconnect/orientation remain open. No screen files were recorded.
+
 # Real iPad → Kagami → OBS correction · 2026-10-10
 
 - The maintainer confirms Start AirPlay is visible and Kagami is discovered on the same LAN by the iPad. Initial negotiation succeeded but neither preview nor camera showed video.

@@ -11,17 +11,17 @@ from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "apps/receiver"))
-from kagami_receiver.airplay import AirPlayTransport, capabilities, media_description, preflight
+from kagami_receiver.airplay import AirPlayTransport, DISCONNECTED_EVENT, EVENTS_VERSION, capabilities, media_description, preflight
 from kagami_receiver.model import FrameFormat, ReceiverError
 
 
 class AirPlayContractTests(unittest.TestCase):
     def test_backend_version_and_required_flags(self):
-        valid = "UxPlay 1.73.2 -vrtp -rc -as -nh -p"
+        valid = "UxPlay 1.73.2 -vrtp -rc -as -nh -p " + EVENTS_VERSION
         with patch("kagami_receiver.airplay.shutil.which", return_value="/usr/bin/uxplay"), patch("kagami_receiver.airplay.command", return_value=valid) as command:
             self.assertEqual(capabilities()["version"], "UxPlay 1.73.2")
             command.assert_called_once_with(["/usr/bin/uxplay", "-rc", "/dev/null", "-h"])
-        for invalid in (valid.replace("1.73.2", "1.68"), valid.replace("-vrtp", ""), "Unknown backend"):
+        for invalid in (valid.replace("1.73.2", "1.68"), valid.replace("-vrtp", ""), valid.replace(EVENTS_VERSION, ""), "Unknown backend"):
             with patch("kagami_receiver.airplay.shutil.which", return_value="uxplay"), patch("kagami_receiver.airplay.command", return_value=invalid), self.assertRaises(ReceiverError):
                 capabilities()
         with patch("kagami_receiver.airplay.shutil.which", return_value=None), self.assertRaises(ReceiverError):
@@ -52,7 +52,7 @@ class AirPlayContractTests(unittest.TestCase):
         self.assertIn("address=127.0.0.1", media_description(30))
         self.assertIn("width=1280,height=720", media_description(30))
 
-    def test_waits_for_real_frames_and_stops_on_stale_stream(self):
+    def test_waits_for_real_frames_and_holds_ten_minutes_of_idle_video(self):
         adapter = AirPlayTransport()
         with patch("kagami_receiver.airplay.capture_format", return_value=FrameFormat(1280, 720)) as capture:
             self.assertIsNone(adapter.frame_format())
@@ -60,9 +60,27 @@ class AirPlayContractTests(unittest.TestCase):
             adapter.source = "/dev/video11"
             adapter.last_frame = time.monotonic()
             self.assertEqual(adapter.frame_format(), FrameFormat(1280, 720))
-            adapter.last_frame -= 5
-            self.assertEqual(adapter.failure().category, "connectivity")
+            adapter.last_frame -= 600
+            self.assertIsNone(adapter.failure())
         self.assertIsNone(adapter.startup_timeout)
+
+    def test_only_exact_protocol_disconnect_event_ends_idle_video(self):
+        adapter = AirPlayTransport()
+        adapter.last_frame = time.monotonic() - 600
+        for line in ("2 missed client feedback signals", "video paused", "prefix " + DISCONNECTED_EVENT):
+            adapter._read_line(line)
+            self.assertIsNone(adapter.failure())
+        adapter._read_line(DISCONNECTED_EVENT + "\n")
+        self.assertEqual(adapter.failure().category, "connectivity")
+        adapter.stop()
+        self.assertIsNone(adapter.failure())
+
+    def test_log_storage_has_bounded_lines_and_count(self):
+        adapter = AirPlayTransport()
+        for _ in range(100):
+            adapter._read_line("x" * 2000)
+        self.assertEqual(len(adapter.logs), 20)
+        self.assertTrue(all(len(line) == 1000 for line in adapter.logs))
 
     def test_start_failure_releases_decoder_before_returning(self):
         gst = Mock()
@@ -78,7 +96,7 @@ class AirPlayContractTests(unittest.TestCase):
     def test_real_child_uses_local_bridge_no_recording_and_is_reaped(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "uxplay"
-            path.write_text("#!/bin/sh\necho listening\nexec sleep 30\n")
+            path.write_text("#!/bin/sh\necho listening\necho " + DISCONNECTED_EVENT + "\nexec sleep 30\n")
             path.chmod(0o755)
             gst = Mock()
             adapter = AirPlayTransport()
@@ -95,6 +113,8 @@ class AirPlayContractTests(unittest.TestCase):
                 self.assertEqual(args[args.index("-as") + 1], "0")
                 self.assertNotIn("-mp4", args)
                 self.assertEqual(adapter.state, "listening")
+                self.assertTrue(adapter.disconnected.wait(timeout=2), "Owned child lifecycle event was not consumed")
+                self.assertEqual(adapter.failure().category, "connectivity")
                 with self.assertRaises(ReceiverError):
                     adapter.start("/dev/video11", 30)
                 adapter.stop()

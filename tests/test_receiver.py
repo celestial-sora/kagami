@@ -171,6 +171,39 @@ class LifecycleTests(unittest.TestCase):
             finally:
                 other.stop()
 
+    def test_idle_airplay_holds_frame_until_protocol_disconnect(self):
+        from kagami_receiver.airplay import AirPlayTransport, DISCONNECTED_EVENT
+        adapter = AirPlayTransport()
+        adapter.last_frame = time.monotonic() - 600
+        self.receiver.transport = adapter
+        self.receiver.output = Mock()
+        self.receiver.output.error.return_value = None
+        processor = self.receiver.processor = Mock(last_frame=adapter.last_frame)
+        processor.error.return_value = None
+        self.receiver.state = "live"
+        self.receiver.tick()
+        self.assertEqual(self.receiver.state, "live")
+        self.receiver.output.slate.assert_not_called()
+        processor.stop.assert_not_called()
+        adapter._read_line(DISCONNECTED_EVENT)
+        self.receiver.tick()
+        self.assertEqual(self.receiver.state, "disconnected")
+        self.receiver.output.slate.assert_called_once()
+        processor.stop.assert_called_once()
+        self.receiver.output.stop.assert_not_called()
+
+    def test_other_transports_still_clear_stale_frames(self):
+        self.transport.hold_idle_frame = False
+        self.receiver.transport = self.transport
+        self.receiver.output = Mock()
+        self.receiver.output.error.return_value = None
+        self.receiver.processor = Mock(last_frame=time.monotonic() - 5)
+        self.receiver.processor.error.return_value = None
+        self.receiver.state = "live"
+        self.receiver.tick()
+        self.assertEqual(self.receiver.state, "waiting")
+        self.receiver.output.slate.assert_called_once()
+
 
 @unittest.skipUnless(os.environ.get("KAGAMI_TEST_GST") == "1", "opt-in real GStreamer raw-frame integration")
 class RawFrameIntegrationTests(unittest.TestCase):
@@ -179,6 +212,53 @@ class RawFrameIntegrationTests(unittest.TestCase):
         self.Gst = gst()
         self.config = OutputConfig(width=64, height=64, fps=10)
         self.frame = FrameFormat(80, 60)
+
+    def test_idle_airplay_repeats_real_camera_frame_and_disconnect_blacks_it(self):
+        from kagami_receiver.airplay import AirPlayTransport, DISCONNECTED_EVENT
+        from kagami_receiver.controller import Receiver
+        from kagami_receiver.pipeline import CameraOutput
+        Gst = self.Gst
+        receiver = Receiver(self.config)
+        output = receiver.output = CameraOutput(self.config, test_sink="appsink name=consumer max-buffers=2 drop=true sync=false")
+        adapter = receiver.transport = AirPlayTransport()
+        adapter.last_frame = time.monotonic() - 600
+        receiver.processor = Mock(last_frame=adapter.last_frame)
+        receiver.processor.error.return_value = None
+        receiver.state = "live"
+        try:
+            output.start()
+            consumer = output.pipeline.get_by_name("consumer")
+            pixels = bytes((255, 0, 0, 255)) * self.config.width * self.config.height
+            output.push(Gst.Sample.new(Gst.Buffer.new_wrapped(pixels), None, None, None))
+            received = []
+            deadline = time.monotonic() + 3
+            while time.monotonic() < deadline and len(received) < 10:
+                receiver.tick()
+                sample = consumer.emit("try-pull-sample", Gst.SECOND // 5)
+                if sample:
+                    buffer = sample.get_buffer()
+                    data = buffer.extract_dup(0, buffer.get_size())
+                    if data[0] > 40:  # The generated red frame, rather than black.
+                        received.append(data)
+            self.assertEqual(len(received), 10)
+            self.assertTrue(all(data == received[0] for data in received))
+            self.assertEqual(receiver.state, "live")
+            adapter._read_line(DISCONNECTED_EVENT)
+            receiver.tick()
+            self.assertEqual(receiver.state, "disconnected")
+            deadline = time.monotonic() + 2
+            black = False
+            while time.monotonic() < deadline:
+                sample = consumer.emit("try-pull-sample", Gst.SECOND // 5)
+                if sample:
+                    buffer = sample.get_buffer()
+                    data = buffer.extract_dup(0, buffer.get_size())
+                    if all(value <= 16 for value in data[::2]):
+                        black = True
+                        break
+            self.assertTrue(black, "Protocol disconnect retained the private last frame")
+        finally:
+            receiver.stop()
 
     def exercise(self, framing):
         from kagami_receiver.pipeline import CameraOutput, Processor

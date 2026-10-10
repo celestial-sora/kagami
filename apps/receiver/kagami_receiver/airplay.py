@@ -19,6 +19,8 @@ from .transport import Device, command
 from .v4l2 import set_output_fps
 
 MEDIA_PLUGINS = ("udpsrc", "rtph264depay", "h264parse", "avdec_h264")
+EVENTS_VERSION = "KAGAMI_AIRPLAY_EVENTS_V1"
+DISCONNECTED_EVENT = "KAGAMI_AIRPLAY_DISCONNECTED"
 
 
 def capabilities():
@@ -28,8 +30,8 @@ def capabilities():
     help_text = command([binary, "-rc", "/dev/null", "-h"])
     match = re.search(r"UxPlay\s+(\d+)\.(\d+)(?:\.(\d+))?", help_text)
     if not match or tuple(map(int, match.groups()[:2])) < (1, 73) or any(
-            flag not in help_text for flag in ("-vrtp", "-rc", "-as", "-nh", "-p")):
-        raise ReceiverError("unsupported", "UxPlay 1.73+ with -vrtp/-rc is required; rerun the Kagami installer.")
+            flag not in help_text for flag in ("-vrtp", "-rc", "-as", "-nh", "-p", EVENTS_VERSION)):
+        raise ReceiverError("unsupported", "Kagami's UxPlay backend with lifecycle events is required; rerun the curl installer.")
     return {"binary": binary, "version": match[0]}
 
 
@@ -71,6 +73,7 @@ def media_description(fps):
 
 class AirPlayTransport:
     startup_timeout = None  # Wait until a user selects Screen Mirroring → Kagami.
+    hold_idle_frame = True  # A still screen can stop producing changed frames.
 
     def __init__(self, port=35000):
         if type(port) is not int or not 1024 <= port <= 65533:
@@ -81,6 +84,7 @@ class AirPlayTransport:
         self.pipeline = self.source = self.Gst = None
         self.logs = deque(maxlen=20)
         self.last_frame = 0
+        self.disconnected = threading.Event()
 
     def start(self, source, fps):
         if self.process or self.pipeline:
@@ -106,19 +110,26 @@ class AirPlayTransport:
             args = [capabilities()["binary"], "-rc", "/dev/null", "-n", "Kagami", "-nh",
                     "-s", f"1280x720@{fps}", "-p", str(self.port), "-as", "0", "-vrtp",
                     f"pt=96 config-interval=1 ! udpsink host=127.0.0.1 port={port} sync=false"]
+            self.disconnected.clear()
+            self.logs.clear()
             self.process = subprocess.Popen(args, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                                             stderr=subprocess.STDOUT, text=True, start_new_session=True)
-            self.logs.clear()
             process = self.process
             def read():
                 for line in process.stdout:
-                    self.logs.append(line.strip())
+                    self._read_line(line)
             self.reader = threading.Thread(target=read, daemon=True, name="kagami-airplay-log")
             self.reader.start()
             self.state = "listening"
         except Exception:
             self.stop()
             raise
+
+    def _read_line(self, line):
+        line = line.strip()
+        if line == DISCONNECTED_EVENT:
+            self.disconnected.set()
+        self.logs.append(line[:1000])
 
     def _frame(self, _pad, _info):
         self.last_frame = time.monotonic()
@@ -130,11 +141,11 @@ class AirPlayTransport:
     def failure(self):
         if self.process and self.process.poll() is not None:
             return ReceiverError("connectivity", "AirPlay backend stopped. " + " ".join(self.logs)[-1000:])
+        if self.disconnected.is_set():
+            return ReceiverError("connectivity", "AirPlay device disconnected. Stop mirroring on the device, then restart Kagami reception.")
         if self.pipeline:
             if error := pipeline_error(self.Gst, self.pipeline):
                 return error
-        if self.last_frame and time.monotonic() - self.last_frame > 4:
-            return ReceiverError("connectivity", "AirPlay stopped sending video. Stop mirroring on the device, then restart Kagami reception.")
         return None
 
     def stop(self):
@@ -162,4 +173,5 @@ class AirPlayTransport:
             process.stdout.close()
         self.process = self.reader = None
         self.last_frame = 0
+        self.disconnected.clear()
         self.state = "stopped"

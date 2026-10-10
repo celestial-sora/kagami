@@ -70,7 +70,8 @@ class Receiver:
                     raise error
                 if self.processor.last_frame:
                     self.transport.state = "live"
-                    self.state = "live" if time.monotonic() - self.processor.last_frame < 3 else "waiting"
+                    keep_frame = getattr(self.transport, "hold_idle_frame", False) is True
+                    self.state = "live" if keep_frame or time.monotonic() - self.processor.last_frame < 3 else "waiting"
                     if self.state == "waiting":
                         self.output.slate()
                 elif getattr(self.transport, "startup_timeout", 15) is not None and time.monotonic() - self.started > getattr(self.transport, "startup_timeout", 15):

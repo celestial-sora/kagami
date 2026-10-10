@@ -1,6 +1,6 @@
 # AirPlay on Ubuntu
 
-Kagami's experimental AirPlay adapter uses [UxPlay](https://github.com/FDH2/UxPlay) 1.73+ as a separate, unprivileged protocol/discovery process. The curl installer builds inspected UxPlay v1.73.2 at `4764e4619e8924f43601d778277fc9f0bf280597` and installs it as `/usr/local/bin/kagami-uxplay`, preserving any independent `uxplay` installation. License, llhttp license and version record are under `/usr/local/share/doc/kagami-uxplay/`.
+Kagami's experimental AirPlay adapter uses [UxPlay](https://github.com/FDH2/UxPlay) as a separate, unprivileged protocol/discovery process. The curl installer builds inspected UxPlay v1.73.2 at `4764e4619e8924f43601d778277fc9f0bf280597` with Kagami's timestamp and lifecycle fixes and installs it as `/usr/local/bin/kagami-uxplay`, preserving any independent `uxplay` installation. The receiver requires the `KAGAMI_AIRPLAY_EVENTS_V1` capability in backend help; an unpatched standalone UxPlay is insufficient. License, llhttp license and version record are under `/usr/local/share/doc/kagami-uxplay/`.
 
 ## Use
 
@@ -16,7 +16,7 @@ The pinned backend gets two compatibility fixes: the missing stdio.h declaration
 
 A fixed input canvas keeps V4L2 dimensions stable when the sender changes orientation. Crop is expressed in that canvas; portrait borders can be cropped. Stop/restart after changing orientation and adjust framing. This does not implement automatic orientation/preset tracking.
 
-UxPlay receives `-rc /dev/null` so personal startup files cannot activate recordings or change Kagami's bridge. Audio, HLS streaming and H265 are not enabled. Screen media is not saved. Logs and frame queues are bounded. Missing frames for four seconds after a stream has started terminate the owned listener/decoder and leave the shared output black until Stop/reconnect. Before first connection, the listener waits without the ADB timeout. Wireless phone identity/preset saving is disabled.
+UxPlay receives `-rc /dev/null` so personal startup files cannot activate recordings or change Kagami's bridge. Audio, HLS streaming and H265 are not enabled. Screen media is not saved. Logs and frame queues are bounded. A static screen may stop producing changed video: Kagami retains the latest frame and keeps the camera writer at the chosen FPS, without an idle media timeout. Explicit video teardown, video TCP EOF, all client control connections closing, connection reset or UxPlay's existing client-feedback watchdog emit a fixed, immediately flushed disconnect event. The receiver then stops its owned listener/decoder and leaves the output black until Stop/reconnect. Discovery probes closing before any mirrored video do not trigger that event. Before first connection, the listener waits without the ADB timeout. Wireless phone identity/preset saving is disabled.
 
 ## Diagnostics and network
 
@@ -31,4 +31,4 @@ On a custom firewall, permit UDP 5353 for local discovery and TCP/UDP 35000–35
 
 ## Verification limits
 
-Contracts cover capabilities, dependency failures, loopback bridge configuration, no recording, stale-stream handling, partial-start cleanup and real child teardown. Synthetic portrait H264/RTP proves decoding and fixed dimensions; a compiled check against the actual UxPlay renderer proves advancing RTP timestamps. On Ubuntu 26.04 the maintainer confirmed real iPad discovery and visible mirrored video in both Kagami and OBS after these corrections. Logs show decoded/processed frames and camera output near 30 FPS. Other Apple devices, long sessions and reconnect/orientation acceptance remain pending; see [validation](validation.md).
+Contracts cover capabilities, dependency failures, loopback bridge configuration, no recording, idle frame retention, protocol disconnect, partial-start cleanup and real child teardown. Synthetic portrait H264/RTP proves decoding and fixed dimensions; compiled checks against the actual UxPlay sources prove advancing RTP timestamps and ten minutes of simulated feedback ticks without changed video, followed by real callback-driven disconnects. A synthetic camera consumer verifies repeated identical frames and black output after disconnect. On Ubuntu 26.04 the maintainer confirmed real iPad discovery and visible mirrored video in both Kagami and OBS, and reports gaming for over ten minutes. Actual long static-screen acceptance of the idle correction, other Apple devices and reconnect/orientation acceptance remain pending; see [validation](validation.md).
