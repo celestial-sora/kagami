@@ -1,3 +1,7 @@
+# Native window header correction · 2026-10-10
+
+The maintainer's v2.0.0 screenshot shows an extra gray title strip and three blank system buttons. Broad .kagami button backgrounds replaced MacTahoe's window-control image assets while its image glyphs were transparent. The desktop now uses one Gtk.HeaderBar with the app branding/actions, and app CSS is scoped to kagami-content boxes that exclude native windowcontrols. Decoration colors stay readable for glyph-based themes; theme image backgrounds are preserved. The GTK smoke check exercises the native close button and validates header/control ancestry. Inspected under MacTahoe-Dark and Adwaita; all 70 contract/media/release tests pass locally. VERSION is 2.0.1 for a guarded stable patch; receiver backends/media behavior are unchanged. Contributor: celestail-sora.
+
 # Stable release v2.0.0 · 2026-10-10
 
 The maintainer authorizes a stable release. The release/** workflow accepts only release/v<VERSION> pointing at the current main commit with successful Checks CI. It packages committed source, generates a tag-pinned Ubuntu installer and SHA256SUMS, uploads a draft, downloads/verifies all asset bytes, then publishes as latest stable. The public README/install guide use the latest stable installer; explicit KAGAMI_REF and the development source installer remain available. This is a source/build installer release, with Smart View experimental and remaining physical-device acceptance recorded in docs/releases/v2.0.0.md. Contributor: celestail-sora.

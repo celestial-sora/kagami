@@ -23,11 +23,28 @@ def activate(application):
     window.set_default_size(920, 520)
     window.present()
     def check():
+        close_button = None
         try:
             assert window.interface.get_text() == "wlan2"
             assert window.mode.get_selected() == 1
             assert window.start.get_label() == "Start AirPlay"
-            assert window.start.get_parent().get_parent() == window.get_child()
+            assert window.get_titlebar() == window.headerbar
+            assert window.start.is_ancestor(window.headerbar)
+            assert window.headerbar.get_show_title_buttons()
+            def descendants(widget):
+                child = widget.get_first_child()
+                while child:
+                    yield child
+                    yield from descendants(child)
+                    child = child.get_next_sibling()
+            close_button = next(widget for widget in descendants(window.headerbar)
+                                if isinstance(widget, Gtk.Button) and widget.has_css_class("close"))
+            assert close_button.get_sensitive()
+            # Native decoration controls must remain outside the app-button CSS scope.
+            ancestor = close_button.get_parent()
+            while ancestor:
+                assert not ancestor.has_css_class("kagami-content")
+                ancestor = ancestor.get_parent()
             assert window.status.get_parent().has_css_class("status-panel")
             assert window.source_cards[0][0].has_css_class("selected")
             window.source_cards[1][0].emit("clicked")
@@ -116,7 +133,10 @@ def activate(application):
                 restored.destroy()
             except Exception as exc:
                 errors.append("Autosave: " + repr(exc))
-            window.close()
+            if close_button is not None:
+                close_button.emit("clicked")
+            else:
+                window.close()
             return GLib.SOURCE_REMOVE
         GLib.timeout_add(600, check_autosave)
         return GLib.SOURCE_REMOVE

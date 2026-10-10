@@ -94,8 +94,8 @@ Repair repeats setup even at the same app commit; matching usable backend builds
 
 ## Stable releases
 
-The public install/update command downloads the latest stable release's **install-kagami.sh**, which selects that release tag by default. Release assets include a source archive, exact commit record, release notes and SHA256 checksums. Backends are built locally; no prebuilt receiver binary is claimed. [v2.0.0 release notes](releases/v2.0.0.md) describe validation and remaining device limits.
+The public install/update command downloads the latest stable release's **install-kagami.sh**, which selects that release tag by default. Release assets include a source archive, exact commit record, release notes and SHA256 checksums. Backends are built locally; no prebuilt receiver binary is claimed. [v2.0.1 release notes](releases/v2.0.1.md) describe validation and remaining device limits.
 
-To pin v2.0.0, replace `releases/latest/download` in the command with `releases/download/v2.0.0`. `KAGAMI_REF` on the bash side explicitly selects another branch, tag or commit; annotated tags resolve to the commit before comparison/download. For development, the repository's `main/install.sh` retains `main` as its default.
+To pin v2.0.1, replace `releases/latest/download` in the command with `releases/download/v2.0.1`. `KAGAMI_REF` on the bash side explicitly selects another branch, tag or commit; annotated tags resolve to the commit before comparison/download. For development, the repository's `main/install.sh` retains `main` as its default.
 
 UxPlay v1.73.2 is built with a narrow compatibility fix adding its missing `<stdio.h>` declaration for GCC 14/15. Kagami retains the pinned upstream commit and normal compiler error checks. This fixes the actual Ubuntu 26.04/GCC 15 build failure; no compiler errors are suppressed.

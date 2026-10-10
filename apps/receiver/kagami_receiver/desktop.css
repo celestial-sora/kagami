@@ -4,57 +4,57 @@ window.kagami {
   font-family: "Ubuntu", "Noto Sans", sans-serif;
   font-size: 16px;
 }
-.kagami .brand-title { font-size: 30px; font-weight: 800; color: #faf3ff; }
-.kagami .brand-icon { min-width: 80px; min-height: 80px; }
-.kagami .subtitle { color: #bdb0db; font-size: 17px; }
-.kagami .panel {
+.kagami-content .brand-title { font-size: 30px; font-weight: 800; color: #faf3ff; }
+.kagami-content .brand-icon { min-width: 80px; min-height: 80px; }
+.kagami-content .subtitle { color: #bdb0db; font-size: 17px; }
+.kagami-content .panel {
   padding: 16px; border: 1px solid #454150; border-radius: 18px;
   background: linear-gradient(120deg, alpha(#161620, .92), alpha(#2b2b36, .6));
 }
-.kagami .section-title { font-size: 20px; font-weight: 700; color: #f2ddff; }
-.kagami .source-card {
+.kagami-content .section-title { font-size: 20px; font-weight: 700; color: #f2ddff; }
+.kagami-content .source-card {
   padding: 14px 16px; border-radius: 17px; min-height: 116px;
   background: linear-gradient(125deg, #383542, #2f2d39);
   border: 2px solid transparent; color: #eadcf9;
 }
-.kagami .source-card.selected {
+.kagami-content .source-card.selected {
   border-color: #ea94f4;
   background: linear-gradient(115deg, #704178, #46314e);
   box-shadow: 0 0 14px alpha(#e787f7, .35), inset 0 0 12px alpha(#ecb1ff, .12);
 }
-.kagami .source-card:hover { background-color: #554064; }
-.kagami .card-title { font-size: 21px; font-weight: 700; color: #fff0ff; }
-.kagami .status-panel { background: linear-gradient(120deg, #30303b, #373540); padding: 18px; }
-.kagami .status-title { color: #efa4ff; font-size: 19px; font-weight: 700; }
-.kagami .connection-status { color: #beb2d6; font-size: 14px; }
-.kagami button, .kagami entry, .kagami dropdown > button, .kagami spinbutton {
+.kagami-content .source-card:hover { background-color: #554064; }
+.kagami-content .card-title { font-size: 21px; font-weight: 700; color: #fff0ff; }
+.kagami-content .status-panel { background: linear-gradient(120deg, #30303b, #373540); padding: 18px; }
+.kagami-content .status-title { color: #efa4ff; font-size: 19px; font-weight: 700; }
+.kagami-content .connection-status { color: #beb2d6; font-size: 14px; }
+.kagami-content button, .kagami-content entry, .kagami-content dropdown > button, .kagami-content spinbutton {
   border: 1px solid #484550; border-radius: 11px; color: #f5eaff;
   background: linear-gradient(110deg, #2e2e39, #272732);
   min-height: 30px;
 }
-.kagami entry { padding: 4px 12px; }
-.kagami button { padding: 6px 12px; }
-.kagami button:hover { background: #44344f; }
-.kagami button.suggested-action { background: linear-gradient(110deg, #9e51f5, #c762e5); font-weight: 700; border-color: #b782ff; }
-.kagami button:disabled { opacity: .5; }
-.kagami button.flat { background: transparent; border-color: transparent; color: #baacd3; }
-.kagami .settings-button > button { min-width: 38px; min-height: 30px; }
-.kagami switch { border-radius: 30px; background: #514e60; border: none; min-width: 56px; }
-.kagami switch slider { border-radius: 100%; background: #f7efff; min-width: 24px; min-height: 24px; margin: 3px; }
-.kagami switch:checked { background: #a257fa; }
-.kagami .preview-badge { padding: 8px 12px; border-radius: 13px; background: #2a2738; border: 1px solid #403a51; font-size: 15px; }
-.kagami .preview-canvas { border-radius: 16px; background: radial-gradient(ellipse at center, #48305f, #1b1728); color: #baa5d2; }
-.kagami .step-number { min-width: 42px; min-height: 42px; border-radius: 100%; color: white; font-size: 23px; font-weight: 700; }
-.kagami .step-1 { background: #575bff; box-shadow: 0 0 15px alpha(#575bff, .4); }
-.kagami .step-2 { background: #ad4cf3; box-shadow: 0 0 15px alpha(#ad4cf3, .4); }
-.kagami .step-3 { background: #e766dc; box-shadow: 0 0 15px alpha(#e766dc, .4); }
-.kagami .step-title { font-weight: 700; color: #f2e7ff; }
-.kagami .advanced { color: #c8b5e0; }
-.kagami popover contents { background: #292333; color: #eee2ff; border: 1px solid #665275; }
-.kagami spinbutton button { min-height: 16px; padding: 4px; }
-.kagami spinbutton image { min-height: 16px; min-width: 16px; }
-.kagami .mirror-toggle:checked { background: #a257fa; }
-.kagami .columns > separator {
+.kagami-content entry { padding: 4px 12px; }
+.kagami-content button { padding: 6px 12px; }
+.kagami-content button:hover { background: #44344f; }
+.kagami-content button.suggested-action { background: linear-gradient(110deg, #9e51f5, #c762e5); font-weight: 700; border-color: #b782ff; }
+.kagami-content button:disabled { opacity: .5; }
+.kagami-content button.flat { background: transparent; border-color: transparent; color: #baacd3; }
+.kagami-content .settings-button > button { min-width: 38px; min-height: 30px; }
+.kagami-content switch { border-radius: 30px; background: #514e60; border: none; min-width: 56px; }
+.kagami-content switch slider { border-radius: 100%; background: #f7efff; min-width: 24px; min-height: 24px; margin: 3px; }
+.kagami-content switch:checked { background: #a257fa; }
+.kagami-content .preview-badge { padding: 8px 12px; border-radius: 13px; background: #2a2738; border: 1px solid #403a51; font-size: 15px; }
+.kagami-content .preview-canvas { border-radius: 16px; background: radial-gradient(ellipse at center, #48305f, #1b1728); color: #baa5d2; }
+.kagami-content .step-number { min-width: 42px; min-height: 42px; border-radius: 100%; color: white; font-size: 23px; font-weight: 700; }
+.kagami-content .step-1 { background: #575bff; box-shadow: 0 0 15px alpha(#575bff, .4); }
+.kagami-content .step-2 { background: #ad4cf3; box-shadow: 0 0 15px alpha(#ad4cf3, .4); }
+.kagami-content .step-3 { background: #e766dc; box-shadow: 0 0 15px alpha(#e766dc, .4); }
+.kagami-content .step-title { font-weight: 700; color: #f2e7ff; }
+.kagami-content .advanced { color: #c8b5e0; }
+.kagami-content popover contents { background: #292333; color: #eee2ff; border: 1px solid #665275; }
+.kagami-content spinbutton button { min-height: 16px; padding: 4px; }
+.kagami-content spinbutton image { min-height: 16px; min-width: 16px; }
+.kagami-content .mirror-toggle:checked { background: #a257fa; }
+.kagami-content .columns > separator {
   min-width: 1px;
   padding: 0;
   margin: 0 12px;
@@ -63,3 +63,11 @@ window.kagami {
   border: none;
   box-shadow: none;
 }
+
+headerbar.kagami-header {
+  background: linear-gradient(125deg, #292737 0%, #15151f 75%, #242431 100%);
+  border: none;
+  box-shadow: none;
+  padding: 12px 18px;
+}
+headerbar.kagami-header windowcontrols button { color: #e9dcff; }
