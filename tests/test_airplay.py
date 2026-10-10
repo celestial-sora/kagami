@@ -69,6 +69,7 @@ class AirPlayContractTests(unittest.TestCase):
         gst.parse_launch.return_value.set_state.return_value = gst.StateChangeReturn.FAILURE
         adapter = AirPlayTransport()
         with patch("kagami_receiver.airplay.preflight", return_value=[]), patch("kagami_receiver.airplay.gst", return_value=gst), \
+                patch("kagami_receiver.airplay.set_output_fps"), \
                 patch("kagami_receiver.airplay.subprocess.Popen") as spawn, self.assertRaises(ReceiverError):
             adapter.start("/dev/video11", 30)
         spawn.assert_not_called()
@@ -83,6 +84,7 @@ class AirPlayContractTests(unittest.TestCase):
             adapter = AirPlayTransport()
             try:
                 with patch("kagami_receiver.airplay.preflight", return_value=[]), patch("kagami_receiver.airplay.gst", return_value=gst), \
+                        patch("kagami_receiver.airplay.set_output_fps"), \
                         patch("kagami_receiver.airplay.capabilities", return_value={"binary": str(path)}):
                     adapter.start("/dev/video11", 30)
                 process = adapter.process

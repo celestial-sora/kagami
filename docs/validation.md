@@ -1,3 +1,12 @@
+# Real iPad → Kagami → OBS correction · 2026-10-10
+
+- The maintainer confirms Start AirPlay is visible and Kagami is discovered on the same LAN by the iPad. Initial negotiation succeeded but neither preview nor camera showed video.
+- Actual diagnostics reproduced videorate discarding decoded frames with CLOCK_TIME_NONE. The pinned UxPlay renderer only assigned PTS when videosink sync was enabled, bypassing it for RTP forwarding. The build now timestamps that path too. A harness compiles against the actual renderer and sends twelve synthetic H264 frames: unpatched v1.73.2 produces one constant RTP timestamp and fails; corrected source produces twelve advancing timestamps and passes.
+- A second failure was reproduced after preview briefly appeared: v4l2sink renegotiated with OBS holding its buffers and failed S_FMT with EBUSY. The shared camera output now runs one fixed-format appsrc at selected FPS, swapping a bounded latest frame/black slate in memory. The loopback interval is corrected before caps probing; compressed H264 is never dropped by a leaky pre-decoder queue.
+- The maintainer then explicitly confirms **video in both Kagami preview and OBS**. Runtime counters show live decoded/processed frames and roughly 30 output frames per second through the actual loopbacks. No screen/media files were recorded.
+- All **54** contracts/media tests pass locally with fatal criticals, including identical camera caps across waiting/live/slate transitions. GTK/Xvfb, ShellCheck and compilation pass. Feature CI must pass before publication to main.
+- Long sessions, other Apple devices, repeated reconnect/orientation handling, Discord, Galaxy/P2P and enabled Secure Boot remain unverified.
+
 # Authorized Ubuntu 26.04 AirPlay installation · 2026-10-10
 
 The maintainer explicitly authorized running the curl installer and correcting real failures while keeping AirPlay installable without P2P.

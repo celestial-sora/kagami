@@ -20,10 +20,21 @@ from pathlib import Path
 import sys
 path = Path(sys.argv[1])
 source = path.read_text()
-anchor = '#include "video_renderer.h"\n'
-if source.count(anchor) != 1:
-    raise SystemExit("Pinned UxPlay header context changed; review the compatibility fix.")
-path.write_text(source.replace(anchor, '#include <stdio.h>\n' + anchor, 1))
+fixes = (
+    ('#include "video_renderer.h"\n', '#include <stdio.h>\n#include "video_renderer.h"\n', 1),
+    ('static bool sync = false;\n', 'static bool sync = false;\nstatic bool timestamp_rtp = false;\n', 1),
+    ('    bool rtp = (bool) strlen(rtp_pipeline);\n',
+     '    bool rtp = (bool) strlen(rtp_pipeline);\n    timestamp_rtp = rtp;\n', 1),
+    ('if (sync) {', 'if (sync || timestamp_rtp) {', 2),
+)
+# RTP forwarding bypasses the videosink sync setting. Preserve presentation
+# timestamps there too, or rtph264pay emits a constant RTP timestamp and the
+# receiver's videorate discards every decoded frame with CLOCK_TIME_NONE.
+for anchor, replacement, count in fixes:
+    if source.count(anchor) != count:
+        raise SystemExit("Pinned UxPlay context changed; review the compatibility fixes.")
+    source = source.replace(anchor, replacement)
+path.write_text(source)
 PY
 printf 'Kagami · Build UxPlay: configuring\n'
 cmake -S "$source_dir" -B "$source_dir/build" -DCMAKE_BUILD_TYPE=Release \

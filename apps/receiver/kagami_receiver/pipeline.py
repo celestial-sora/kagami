@@ -6,13 +6,13 @@ import struct
 import threading
 import time
 
-from kagami_receiver.v4l2 import CAPABILITY, VIDIOC_QUERYCAP, query_device
+from kagami_receiver.v4l2 import CAPABILITY, VIDIOC_QUERYCAP, query_device, set_output_fps
 from .model import FrameFormat, ReceiverError
 
 QUEUE = "queue leaky=downstream max-size-buffers=2 max-size-bytes=0 max-size-time=0"
 REQUIRED = ("v4l2src", "v4l2sink", "videoconvert", "videocrop", "videoflip",
             "videoscale", "videobox", "videorate", "tee", "queue", "appsrc",
-            "appsink", "input-selector", "videotestsrc")
+            "appsink")
 
 
 def gst():
@@ -91,54 +91,78 @@ class CameraOutput:
     def __init__(self, config, *, test_sink=None):
         self.config, self.test_sink = config, test_sink
         self.Gst = gst()
-        self.pipeline = self.source = self.selector = None
+        self.pipeline = self.source = None
         self.frames = 0
+        self.lock = threading.Lock()
+        self.latest = self.black = self.writer = None
+        self.stopped = threading.Event()
+        self.fault = None
 
     def start(self):
         Gst, config = self.Gst, self.config
         if self.test_sink is None:
-            query_device(config.device)
-        caps = f"video/x-raw,format=RGBA,width={config.width},height={config.height},framerate={config.fps}/1,pixel-aspect-ratio=1/1"
+            set_output_fps(config.device, config.fps)
+        caps = f"video/x-raw,format=RGBA,width={config.width},height={config.height},framerate={config.fps}/1,pixel-aspect-ratio=1/1,colorimetry=sRGB,interlace-mode=progressive"
         self.pipeline = Gst.parse_launch(
-            "input-selector name=select sync-streams=true sync-mode=clock cache-buffers=false ! "
-            f"{QUEUE} ! videoconvert ! video/x-raw,format=YUY2 ! " +
-            (self.test_sink or "v4l2sink name=camera sync=false") + " " +
-            f"videotestsrc is-live=true pattern=black ! {caps} ! select.sink_0 " +
-            f"appsrc name=frames is-live=true format=time do-timestamp=true block=false max-buffers=2 leaky-type=downstream caps=\"{caps}\" ! select.sink_1")
+            f"appsrc name=frames is-live=true format=time do-timestamp=true block=false max-buffers=2 leaky-type=downstream caps=\"{caps}\" ! "
+            f"{QUEUE} ! videoconvert ! video/x-raw,format=YUY2,colorimetry=2:4:7:1,interlace-mode=progressive ! " +
+            (self.test_sink or "v4l2sink name=camera sync=false"))
         if self.test_sink is None:
             self.pipeline.get_by_name("camera").set_property("device", config.device)
         self.source = self.pipeline.get_by_name("frames")
-        self.selector = self.pipeline.get_by_name("select")
-        self.slate()
-        self.selector.get_static_pad("src").add_probe(Gst.PadProbeType.BUFFER, self._count)
+        pixels = bytes((0, 0, 0, 255)) * (config.width * config.height)
+        self.black = Gst.Buffer.new_allocate(None, len(pixels), None)
+        self.black.fill(0, pixels)
+        self.source.get_static_pad("src").add_probe(Gst.PadProbeType.BUFFER, self._count)
         if self.pipeline.set_state(Gst.State.PLAYING) == Gst.StateChangeReturn.FAILURE:
             raise ReceiverError("format", "Cannot start the output; check permissions and device caps.")
+        self.stopped.clear()
+        self.fault = None
+        self.writer = threading.Thread(target=self._write, daemon=True, name="kagami-camera-writer")
+        self.writer.start()
 
     def _count(self, _pad, _info):
         self.frames += 1
         return self.Gst.PadProbeReturn.OK
 
     def push(self, sample):
-        # Input and output have separate clocks. Timestamp at the writer boundary.
-        buffer = sample.get_buffer().copy_deep()
-        buffer.pts = buffer.dts = self.Gst.CLOCK_TIME_NONE
-        buffer.duration = self.Gst.SECOND // self.config.fps
-        result = self.source.emit("push-buffer", buffer)
-        if result == self.Gst.FlowReturn.OK:
-            self.selector.set_property("active-pad", self.selector.get_static_pad("sink_1"))
-        return result
+        if not self.source or self.stopped.is_set() or self.fault:
+            return self.Gst.FlowReturn.FLUSHING
+        with self.lock:
+            self.latest = sample.get_buffer().copy_deep()
+        return self.Gst.FlowReturn.OK
+
+    def _write(self):
+        # One source/caps/clock for slate and video. Switching selector pads used
+        # to renegotiate v4l2sink while OBS held its buffers, failing with EBUSY.
+        interval, deadline = 1 / self.config.fps, time.monotonic()
+        while not self.stopped.is_set():
+            with self.lock:
+                buffer = (self.latest if self.latest is not None else self.black).copy_deep()
+            buffer.pts = buffer.dts = self.Gst.CLOCK_TIME_NONE
+            buffer.duration = self.Gst.SECOND // self.config.fps
+            if self.source.emit("push-buffer", buffer) != self.Gst.FlowReturn.OK:
+                self.fault = ReceiverError("format", "Virtual Camera stopped accepting frames. Stop and restart Kagami.")
+                return
+            deadline = max(deadline + interval, time.monotonic())
+            self.stopped.wait(max(0, deadline - time.monotonic()))
 
     def slate(self):
-        if self.selector:
-            self.selector.set_property("active-pad", self.selector.get_static_pad("sink_0"))
+        with self.lock:
+            self.latest = None
 
     def error(self):
-        return pipeline_error(self.Gst, self.pipeline) if self.pipeline else None
+        return self.fault or (pipeline_error(self.Gst, self.pipeline) if self.pipeline else None)
 
     def stop(self):
+        self.stopped.set()
+        if self.writer:
+            self.writer.join(timeout=2)
+            self.writer = None
         if self.pipeline:
             self.pipeline.set_state(self.Gst.State.NULL)
-        self.pipeline = self.source = self.selector = None
+        self.pipeline = self.source = None
+        self.latest = self.black = None
 
 
 class Processor:

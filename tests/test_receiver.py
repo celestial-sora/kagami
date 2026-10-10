@@ -187,6 +187,10 @@ class RawFrameIntegrationTests(unittest.TestCase):
         processor = Processor(self.frame, framing, self.config, output, test_source='appsrc name=test is-live=true format=time do-timestamp=true caps="video/x-raw,format=RGBA,width=80,height=60,framerate=10/1,pixel-aspect-ratio=1/1"')
         try:
             output.start()
+            consumer = output.pipeline.get_by_name("consumer")
+            slate = consumer.emit("try-pull-sample", Gst.SECOND)
+            self.assertIsNotNone(slate)
+            slate_caps = slate.get_caps()
             processor.start()
             pixels = b"".join(bytes(((255, 0, 0, 255) if x < 40 else (0, 255, 0, 255)) if y < 30 else ((0, 0, 255, 255) if x < 40 else (255, 255, 0, 255))) for y in range(60) for x in range(80))
             source = processor.pipeline.get_by_name("test")
@@ -218,6 +222,8 @@ class RawFrameIntegrationTests(unittest.TestCase):
             else:
                 self.fail("transformed signal never reached the YUY2 output")
             self.assertGreater(output.frames, 0)
+            self.assertTrue(sample.get_caps().is_equal(slate_caps),
+                            "Slate/live switch renegotiated the consumer's camera caps")
             self.assertGreater(processor.metrics()["frames_processed"], 0)
             writer = output.pipeline
             processor.stop()

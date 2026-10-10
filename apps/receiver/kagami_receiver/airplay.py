@@ -16,8 +16,9 @@ import time
 from .model import ReceiverError
 from .pipeline import QUEUE, capture_format, gst, pipeline_error
 from .transport import Device, command
+from .v4l2 import set_output_fps
 
-MEDIA_PLUGINS = ("udpsrc", "rtpjitterbuffer", "rtph264depay", "h264parse", "avdec_h264")
+MEDIA_PLUGINS = ("udpsrc", "rtph264depay", "h264parse", "avdec_h264")
 
 
 def capabilities():
@@ -63,8 +64,8 @@ def media_description(fps):
         raise ValueError("Use 1–60 FPS.")
     return ('udpsrc name=rtp address=127.0.0.1 timeout=3000000000 '
             'caps="application/x-rtp,media=video,clock-rate=90000,encoding-name=H264,payload=96" ! '
-            'rtpjitterbuffer latency=100 drop-on-latency=true ! rtph264depay ! '
-            f'h264parse ! {QUEUE} ! avdec_h264 ! videoconvert ! videoscale add-borders=true ! videorate ! '
+            'rtph264depay ! '
+            f'h264parse ! avdec_h264 ! {QUEUE} ! videoconvert ! videoscale add-borders=true ! videorate skip-to-first=true ! '
             f'video/x-raw,format=I420,width=1280,height=720,pixel-aspect-ratio=1/1,framerate={fps}/1 ! ')
 
 
@@ -89,6 +90,7 @@ class AirPlayTransport:
             raise ReceiverError("unsupported", " ".join(failed))
         self.Gst, self.source = gst(), source
         try:
+            set_output_fps(source, fps)
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as reservation:
                 reservation.bind(("127.0.0.1", 0))
                 port = reservation.getsockname()[1]
