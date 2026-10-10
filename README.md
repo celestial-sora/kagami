@@ -1,10 +1,6 @@
-<p align="center">
-  <img src="assets/kagami-icon.webp" alt="Kagami app icon" width="144" />
-</p>
-
 <div align="center">
 
-<img src="apps/receiver/kagami_receiver/icons/hicolor/256x256/apps/io.kagami.Host.png" width="128" height="128" alt="Kagami app icon">
+<img src="assets/kagami-icon.webp" width="144" height="144" alt="Kagami app icon">
 
 # Kagami · 鏡
 
