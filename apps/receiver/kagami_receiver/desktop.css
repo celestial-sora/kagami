@@ -5,11 +5,7 @@ window.kagami {
   font-size: 16px;
 }
 .kagami .brand-title { font-size: 30px; font-weight: 800; color: #faf3ff; }
-.kagami .brand-icon {
-  font-size: 62px; color: #f0adff; min-width: 78px; min-height: 78px;
-  border: 1px solid #75608b; border-radius: 20px;
-  background: linear-gradient(140deg, #15131e, #372643);
-}
+.kagami .brand-icon { min-width: 80px; min-height: 80px; }
 .kagami .subtitle { color: #bdb0db; font-size: 17px; }
 .kagami .panel {
   padding: 16px; border: 1px solid #454150; border-radius: 18px;
@@ -58,4 +54,12 @@ window.kagami {
 .kagami spinbutton button { min-height: 16px; padding: 4px; }
 .kagami spinbutton image { min-height: 16px; min-width: 16px; }
 .kagami .mirror-toggle:checked { background: #a257fa; }
-.kagami .columns > separator { min-width: 18px; background: transparent; }
+.kagami .columns > separator {
+  min-width: 1px;
+  padding: 0;
+  margin: 0 12px;
+  background: #484151;
+  background-image: none;
+  border: none;
+  box-shadow: none;
+}
