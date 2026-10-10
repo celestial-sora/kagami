@@ -8,14 +8,18 @@
 
 **Phone / Tablet → Kagami → OBS / Discord**
 
-Ubuntu 24.04 / 26.04 · Native GTK4 · Local-first · No account · MIT
+**Ubuntu / Ubuntu-based distros · Windows / Fedora coming soon**
+
+Native GTK4 · Local-first · No account · MIT
 
 </div>
 
 Kagami receives a phone's **mirrored screen**, lets you crop and adjust the picture, and publishes it as **Kagami Virtual Camera** on Ubuntu. No separate Kagami phone app, cloud relay, browser pairing page, or QR code is required.
 
 <details>
-<summary><strong>Screenshots / ภาพหน้าจอ</strong></summary>
+<summary><strong>Screenshots — click to expand / ภาพหน้าจอ — กดเพื่อเปิด</strong></summary>
+
+Click a preview to view the full-size image. / คลิกภาพตัวอย่างเพื่อดูขนาดเต็ม
 
 | Ready for AirPlay / ก่อนเริ่ม AirPlay | iPad via AirPlay / iPad ผ่าน AirPlay |
 | :---: | :---: |
@@ -30,6 +34,8 @@ Open a terminal on **Ubuntu 24.04 or 26.04** and run this as your normal desktop
 ~~~bash
 curl -fsSL https://github.com/celestial-sora/kagami/releases/latest/download/install-kagami.sh | bash
 ~~~
+
+The one-command installer targets Ubuntu 24.04 / 26.04. For other **Ubuntu-based distros**, see the [manual setup](docs/smartview-ubuntu.md). / ตัวติดตั้งคำสั่งเดียวใช้กับ Ubuntu 24.04 / 26.04 ส่วนดิสโทรที่ใช้ Ubuntu เป็นฐาน ดู[วิธีติดตั้งด้วยตนเอง](docs/smartview-ubuntu.md)
 
 The latest stable installer selects its published release tag by default. The installer sets up the desktop app, receiver dependencies, and virtual camera. It may request your **sudo password**. If Secure Boot is enabled, camera-driver enrollment may also require a reboot. [Read the installation guide](docs/installation.md) or [inspect the script](install.sh) before running it.
 
