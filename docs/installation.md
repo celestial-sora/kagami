@@ -6,11 +6,15 @@ Run in a terminal as your ordinary desktop user on Ubuntu 24.04 or 26.04:
 curl -fsSL https://raw.githubusercontent.com/celestial-sora/kagami/main/install.sh | bash
 ```
 
-This installs **Kagami V2**, replacing the normal Kagami application-menu/CLI entry point with the native screen receiver. Samsung Smart View is the default, experimental transport. Previous V1 app versions, HTTPS config/CA and receiver presets are preserved. The retained Fedora browser bridge has a separate [V1 installer](installation-v1.md).
+This installs **Kagami V2**, replacing the normal Kagami application-menu/CLI entry point with the native screen receiver. Samsung Smart View is the default, experimental transport. Previous V1 app versions, HTTPS config/CA and receiver presets are preserved. The browser URL/QR client, HTTPS/WebRTC pairing service and V1 shell/installer have been removed. Connections use the sender’s Smart View or Screen Mirroring discovery list.
 
-The command requests your sudo password, installs GTK4/Python/GStreamer, Wi-Fi Direct tools, matching running-kernel headers and the DKMS virtual camera driver. It downloads Kagami and builds [MiracleCast](https://github.com/albfan/miraclecast) at pinned commit `0b7f1f1f6586dc65ff480f3cda5c2170a70aa020` as your ordinary user. Only fixed binaries, D-Bus policy, network helpers and camera service are installed as root. MiracleCast's license is installed with its version record. No Rust build or phone app is required for Smart View.
+The command requests your sudo password, installs GTK4/Python/GStreamer, Avahi discovery, Wi-Fi Direct tools, matching running-kernel headers and the DKMS virtual camera driver. It downloads Kagami and builds [MiracleCast](https://github.com/albfan/miraclecast) at pinned commit `0b7f1f1f6586dc65ff480f3cda5c2170a70aa020` as your ordinary user. It also builds UxPlay v1.73.2 at `4764e4619e8924f43601d778277fc9f0bf280597`, installing `/usr/local/bin/kagami-uxplay` plus license/version files. Only fixed binaries, D-Bus policy, network helpers and camera service are installed as root. MiracleCast's license is installed with its version record. No Rust build or phone app is required for Smart View.
 
 Internet is needed for installation/updates. Installation leaves Wi-Fi connected; it does not start the receiver, alter global networking, grant passwordless sudo, or open generic firewall ports. During streaming the selected adapter is handed to MiracleCast only after you confirm in Kagami. Custom firewalls may need interface-scoped Miracast rules after the actual P2P interface is known.
+
+## AirPlay
+
+Choose **AirPlay**, click **Check AirPlay**, then **Start**. On an iPhone/iPad/Mac on the same local network, choose **Screen Mirroring → Kagami**. Crop the preview and select Kagami Virtual Camera in OBS. It needs Avahi/mDNS, not Wi-Fi Direct. The installer enables Avahi; user-defined firewalls may need LAN-scoped UDP 5353 and TCP/UDP 35000–35002. See [AirPlay setup](airplay-ubuntu.md). Native Galaxy Smart View remains the separate Miracast mode; no Android AirPlay sender has been validated. Physical Apple interoperability is pending.
 
 ## After installation
 
@@ -32,14 +36,15 @@ Matching headers for the running kernel are required. DKMS builds the driver and
 
 With Secure Boot enabled, Ubuntu/DKMS signing may require a MOK enrollment password. The installer requests enrollment using the terminal if the signing certificate is not already enrolled. Reboot and choose **Enroll MOK**, confirming with the password you set. The enabled camera service will create the named nodes after reboot; no additional manual helper commands are needed. Secure Boot is never disabled.
 
-Exit status **0** means software/camera prerequisite checks passed; it does not mean a Galaxy was tested. **10** means the application was installed but MOK enrollment/reboot or P2P hardware is pending. **2** means setup or required software checks failed. Package/build commands can also propagate their own failure status. Read the preceding report for the specific missing prerequisite.
+Exit status **0** after a full installation means software/camera prerequisite checks passed (an unchanged-commit shortcut only confirms the active app version); it does not mean a Galaxy was tested. **10** means the application was installed but MOK enrollment/reboot or P2P hardware is pending. **2** means setup or required software checks failed. Package/build commands can also propagate their own failure status. Read the preceding report for the specific missing prerequisite.
 
 ## Updates and paths
 
-Run the same curl command to update. The application is versioned by Git SHA/architecture and activated after software checks. Installation settings and explicitly saved crop presets are preserved. Re-running currently rebuilds pinned MiracleCast in a fresh staging directory.
+Run the same curl command to update. The application is versioned by Git SHA/architecture and activated after software checks. Installation settings and explicitly saved crop presets are preserved. The installer resolves the requested ref before downloading and compares the full commit with the active version. An unchanged commit exits without downloading, package installation or builds. During app updates, MiracleCast/UxPlay are reused when their build recipe, Ubuntu version, architecture and binary checks match; otherwise they are rebuilt as your ordinary user. Numbered steps show Check, Download, Install, Build and Verify, with backend configure/compile/stage messages.
 
 | Item | Default path |
 |---|---|
+| Version switch helper | `~/.local/share/kagami/manage_versions.py` |
 | App versions / active version | `~/.local/share/kagami/versions/v2-…` / `current` |
 | CLI / desktop launcher | `~/.local/bin/kagami` / `~/.local/share/applications/io.kagami.Host.desktop` |
 | Installation settings | `~/.config/kagami/receiver-install.json` |
@@ -48,9 +53,10 @@ Run the same curl command to update. The application is versioned by Git SHA/arc
 | Camera boot service | `/etc/systemd/system/kagami-receiver-camera.service` |
 | Camera ACL rule | `/etc/udev/rules.d/70-kagami-camera.rules` |
 | MiracleCast binaries / D-Bus policy | `/usr/local/bin/miracle-{wifid,sinkctl,dhcp}` / `/etc/dbus-1/system.d/org.freedesktop.miracle.conf` |
-| MiracleCast license / pinned version | `/usr/local/share/doc/kagami-miraclecast/` |
+| MiracleCast license / pinned version / build stamp | `/usr/local/share/doc/kagami-miraclecast/` |
+| UxPlay binary / licenses / build stamp | `/usr/local/bin/kagami-uxplay` / `/usr/local/share/doc/kagami-uxplay/` |
 
-`XDG_DATA_HOME` and `XDG_CONFIG_HOME` are honored. The CLI's full path works even when `~/.local/bin` is not in PATH. Saved installation settings initialize the launcher; per-launch flags override them. Stop an already running V1/V2 app before opening the newly installed version: an update does not kill a running screen receiver.
+`XDG_DATA_HOME` and `XDG_CONFIG_HOME` are honored. The CLI's full path works even when `~/.local/bin` is not in PATH. Saved installation settings initialize the launcher; per-launch flags override them. Stop an already running Kagami app before opening the newly installed version: an update does not kill a running screen receiver.
 
 Inspect the plan without changes:
 
@@ -65,3 +71,26 @@ curl -fsSL https://raw.githubusercontent.com/celestial-sora/kagami/main/install.
 ```
 
 `KAGAMI_REF` on the `bash` side selects a branch, tag or commit. See [source setup](smartview-ubuntu.md) for manual/developer steps.
+
+## Rollback and repair
+
+Stop Kagami before switching versions. Updates preserve app directories and atomically switch `current`, retaining the prior directory through `previous`. To inspect or switch:
+
+```bash
+~/.local/bin/kagami versions
+~/.local/bin/kagami rollback
+```
+
+Rollback swaps current/previous, so running it again restores the newer app. It keeps installation settings and crop presets. It switches the application only: shared Ubuntu packages, DKMS driver, system helpers and pinned backends are not downgraded. An archival V1 directory is retained but cannot be activated through this V2 rollback command because the URL/QR runtime has been removed. Backend changes may require matching prerequisites for older app versions.
+
+The curl installer also accepts `--list-versions` and `--rollback` without app/backend downloads or root installation. To repeat prerequisite checks after a kernel update, MOK enrollment or damaged system installation, use:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/celestial-sora/kagami/main/install.sh | bash -s -- --repair
+```
+
+Repair repeats setup even at the same app commit; matching usable backend builds are still reused.
+
+## Stable releases
+
+The development default remains `main`. `KAGAMI_REF` already accepts release tags and full commit IDs; annotated tags are resolved to their commit before comparison/download. Once tested GitHub Releases are published, the default channel can move to a release-pinned installer with checksummed artifacts. No stable release or prebuilt artifact is claimed by the current installer. Use an actually published tag on the bash side, for example `KAGAMI_REF=<published-tag> bash`, instead of inventing a version name.

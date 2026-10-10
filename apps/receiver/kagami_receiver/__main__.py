@@ -19,7 +19,7 @@ def report(value):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", nargs="?", choices=("desktop", "doctor", "devices", "pair", "connect", "mirror", "smartview", "smartview-doctor"), default="desktop")
+    parser.add_argument("action", nargs="?", choices=("desktop", "doctor", "devices", "pair", "connect", "mirror", "smartview", "smartview-doctor", "airplay", "airplay-doctor"), default="desktop")
     parser.add_argument("--source", default="/dev/video11")
     parser.add_argument("--output", default="/dev/video10")
     parser.add_argument("--width", type=int, default=1280)
@@ -34,6 +34,7 @@ def main():
     parser.add_argument("--fit", choices=("fit", "fill"), default="fit")
     parser.add_argument("--interface", default="wlo1")
     parser.add_argument("--allow-network-disconnect", action="store_true")
+    parser.add_argument("--airplay-port", type=int, default=35000)
     args = parser.parse_args()
     receiver = None
     cleanup_failed = False
@@ -47,13 +48,18 @@ def main():
             if not args.endpoint:
                 parser.error("--endpoint IP:port is required")
             report({"message": pair(args.endpoint, getpass.getpass("Android pairing code: ")) if args.action == "pair" else connect(args.endpoint)})
+        elif args.action == "airplay-doctor":
+            from .airplay import preflight
+            checks = preflight()
+            report({"checks": checks, "apple_interoperability": "physical iPhone/iPad/Mac test pending"})
+            return 0 if all(c["ok"] for c in checks) else 2
         elif args.action == "smartview-doctor":
             from .smartview import preflight
             checks = preflight(args.interface)
             report({"checks": checks, "samsung_interoperability": "physical Galaxy test pending"})
             return 0 if all(c["ok"] for c in checks) else 2
         elif args.action == "doctor":
-            from kagami_host.v4l2 import query_device
+            from kagami_receiver.v4l2 import query_device
             from .pipeline import gst
             checks = []
             for name, function in (("scrcpy", scrcpy_capabilities), ("adb", lambda: [asdict(d) for d in devices()]),
@@ -72,10 +78,11 @@ def main():
         else:
             from .controller import Receiver
             from .model import Crop
-            if args.action != "smartview" and not args.serial:
+            wireless = args.action in ("smartview", "airplay")
+            if not wireless and not args.serial:
                 parser.error("mirror requires --serial from the devices command")
-            identity = next((d for d in devices() if d.serial == args.serial), None) if args.action != "smartview" else None
-            if args.action != "smartview" and identity is None:
+            identity = next((d for d in devices() if d.serial == args.serial), None) if not wireless else None
+            if not wireless and identity is None:
                 raise ReceiverError("connectivity", "Selected Android device is not connected.")
             receiver = Receiver(config)
             crop = Crop(*map(float, args.crop.split(","))) if args.crop else Crop()
@@ -89,6 +96,9 @@ def main():
             if args.action == "smartview":
                 from .smartview import SmartViewTransport
                 adapter = SmartViewTransport(args.interface, allow_disconnect=args.allow_network_disconnect)
+            elif args.action == "airplay":
+                from .airplay import AirPlayTransport
+                adapter = AirPlayTransport(args.airplay_port)
             else:
                 adapter = ScrcpyTransport(identity, args.mode)
             receiver.start(adapter)

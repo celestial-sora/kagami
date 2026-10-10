@@ -13,6 +13,7 @@ from .controller import Receiver
 from .model import Crop, Framing, OutputConfig, Presets, content_rect, drag_crop, centered_crop
 from .transport import ScrcpyTransport, connect, devices, pair
 from .smartview import SmartViewTransport, preflight
+from .airplay import AirPlayTransport, preflight as airplay_preflight
 
 
 class Window(Gtk.ApplicationWindow):
@@ -33,7 +34,7 @@ class Window(Gtk.ApplicationWindow):
         body.append(heading)
         body.append(self.label("Open Samsung Camera, TikTok, or your preferred app on the phone. Drag over its preview to crop."))
         modes = Gtk.Box(spacing=10)
-        self.mode = Gtk.DropDown.new_from_strings(["Samsung Smart View (experimental)", "USB Mirror (fallback)", "Wi-Fi ADB Mirror"])
+        self.mode = Gtk.DropDown.new_from_strings(["Samsung Smart View (experimental)", "AirPlay · iPhone / iPad / Mac (experimental)", "USB Mirror (fallback)", "Wi-Fi ADB Mirror"])
         self.device = Gtk.DropDown.new_from_strings(["Refresh to find authorized Android devices"])
         self.device.set_hexpand(True)
         self.refresh = Gtk.Button(label="Refresh devices")
@@ -41,8 +42,9 @@ class Window(Gtk.ApplicationWindow):
         for widget in (self.mode, self.device, self.refresh):
             modes.append(widget)
         body.append(modes)
-        body.append(self.label("USB: enable Developer options → USB debugging, unlock the phone, and accept its authorization prompt."))
-        body.append(self.label("Smart View uses Miracast/Wi-Fi Direct, not ADB. Google Cast remains research-only. Smart View interoperability needs a real Galaxy test."))
+        self.adb_info = self.label("USB: enable Developer options → USB debugging, unlock the phone, and accept its authorization prompt.")
+        body.append(self.adb_info)
+        body.append(self.label("Smart View: Galaxy → Smart View → Kagami. AirPlay: same local network → Screen Mirroring → Kagami."))
         smart = Gtk.Box(spacing=8)
         self.interface = Gtk.Entry(text=interface, placeholder_text="P2P Wi-Fi interface")
         self.allow_disconnect = Gtk.CheckButton(label="Allow this adapter to disconnect while receiving")
@@ -51,6 +53,9 @@ class Window(Gtk.ApplicationWindow):
         for widget in (self.interface, self.allow_disconnect, check_smart):
             smart.append(widget)
         body.append(smart)
+        check_air = Gtk.Button(label="Check AirPlay")
+        check_air.connect("clicked", lambda _: self.run_task(airplay_preflight, lambda checks: self.status.set_text(" · ".join(f"{c['name']}: {c['detail']}" for c in checks))))
+        body.append(check_air)
         wireless = Gtk.Expander(label="Android Wireless debugging — explicit pairing and connection")
         wifi = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         wifi.append(self.label("Enable Wireless debugging on a trusted local network. Pairing and connection use different ports from the Android screen."))
@@ -71,6 +76,7 @@ class Window(Gtk.ApplicationWindow):
         wifi.append(row)
         wireless.set_child(wifi)
         body.append(wireless)
+        self.transport_panels = smart, check_air, wireless
         row = Gtk.Box(spacing=8)
         self.source = Gtk.Entry(text=config.source)
         self.output = Gtk.Entry(text=config.device)
@@ -125,7 +131,7 @@ class Window(Gtk.ApplicationWindow):
         for widget in (self.aspect, self.rotation, self.mirror, self.fit, self.apply, reset):
             controls.append(widget)
         body.append(controls)
-        body.append(self.label("Crop removes controls outside the rectangle. Overlays inside it remain. Capture orientation is locked at connection; stop/restart after changing phone orientation."))
+        body.append(self.label("Crop removes controls outside the rectangle. Overlays inside it remain. Stop/restart after changing phone orientation; AirPlay places the screen inside a fixed 1280×720 canvas."))
         row = Gtk.Box(spacing=8)
         self.app_name = Gtk.Entry(text="Samsung Camera", placeholder_text="Preset label (app name)")
         self.save = Gtk.Button(label="Save preset")
@@ -151,6 +157,18 @@ class Window(Gtk.ApplicationWindow):
         self.signal_sources = [GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, value, self.signal_stop)
                                for value in (signal.SIGTERM, signal.SIGINT)]
         self.metric_tick = 0
+        self.mode.connect("notify::selected", self.update_mode)
+        self.update_mode()
+        self.sensitivity()
+
+    def update_mode(self, *_args):
+        mode = self.mode.get_selected()
+        smart, air, wireless = self.transport_panels
+        smart.set_visible(mode == 0)
+        air.set_visible(mode == 1)
+        wireless.set_visible(mode == 3)
+        for widget in (self.device, self.refresh, self.adb_info):
+            widget.set_visible(mode >= 2)
 
     @staticmethod
     def label(text):
@@ -215,18 +233,24 @@ class Window(Gtk.ApplicationWindow):
     def start_receiver(self, _button):
         try:
             index = self.device.get_selected()
-            if self.mode.get_selected() and index >= len(self.items):
+            mode = self.mode.get_selected()
+            if mode >= 2 and index >= len(self.items):
                 raise ValueError("Refresh and select an authorized Android device.")
             width, height = self.sizes[self.size.get_selected()]
             config = OutputConfig(self.source.get_text(), self.output.get_text(), width, height, self.fps.get_value_as_int())
             self.receiver.stop()
             self.receiver = Receiver(config)
             self.crop, self.frame, self.loaded_key = Crop(), None, None
-            if self.mode.get_selected() == 0:
+            if mode == 0:
                 adapter = SmartViewTransport(self.interface.get_text(), allow_disconnect=self.allow_disconnect.get_active())
+                message = "Open Smart View on the Galaxy and select Kagami."
+            elif mode == 1:
+                adapter = AirPlayTransport()
+                message = "On iPhone/iPad/Mac, open Screen Mirroring and select Kagami on the same local network."
             else:
-                adapter = ScrcpyTransport(self.items[index], "wifi" if self.mode.get_selected() == 2 else "usb")
-            self.run_task(lambda: self.receiver.start(adapter), lambda _: self.status.set_text("Open Smart View on the Galaxy and select Kagami." if self.mode.get_selected() == 0 else "Starting screen mirror…"))
+                adapter = ScrcpyTransport(self.items[index], "wifi" if mode == 3 else "usb")
+                message = "Starting screen mirror…"
+            self.run_task(lambda: self.receiver.start(adapter), lambda _: self.status.set_text(message))
         except (ValueError, RuntimeError, OSError) as exc:
             self.status.set_text(str(exc))
 
@@ -273,8 +297,8 @@ class Window(Gtk.ApplicationWindow):
         if not self.frame or not self.receiver.transport:
             self.status.set_text("Start mirroring before saving a device/orientation preset.")
             return
-        if self.receiver.transport.identity.connection == "miracast":
-            self.status.set_text("Smart View phone identity is not verified yet. Saved device presets are available for authorized ADB devices.")
+        if self.receiver.transport.identity.connection in ("miracast", "airplay"):
+            self.status.set_text("Wireless phone identity is not verified yet. Saved device presets are available for authorized ADB devices.")
             return
         try:
             self.presets.save(self.receiver.transport.identity.serial, self.app_name.get_text(), self.frame, self.framing())
@@ -315,6 +339,9 @@ class Window(Gtk.ApplicationWindow):
         if self.receiver.frame and self.loaded_key is None:
             self.frame = self.receiver.frame
             self.loaded_key = Presets.key(self.receiver.transport.identity.serial, self.app_name.get_text(), self.frame)
+            if self.receiver.transport.identity.connection in ("miracast", "airplay"):
+                self.drawing.queue_draw()
+                return GLib.SOURCE_CONTINUE
             try:
                 preset = self.presets.load(self.receiver.transport.identity.serial, self.app_name.get_text(), self.frame)
                 self.crop = preset.crop

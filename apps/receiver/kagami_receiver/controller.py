@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 import time
 
-from kagami_host.v4l2 import query_device
+from kagami_receiver.v4l2 import query_device
 from .model import Framing, ReceiverError
 from .pipeline import CameraOutput, Processor
 

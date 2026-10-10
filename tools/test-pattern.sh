@@ -7,8 +7,8 @@ case "$device" in
 esac
 # Reuse the actual V4L2 guard; never stream test frames into a physical camera.
 project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PYTHONPATH="$project_root/apps/host" "${KAGAMI_PYTHON:-python3}" -c \
-  'import sys; from kagami_host.v4l2 import query_device; print(query_device(sys.argv[1]))' "$device"
+PYTHONPATH="$project_root/apps/receiver" "${KAGAMI_PYTHON:-python3}" -c \
+  'import sys; from kagami_receiver.v4l2 import query_device; print(query_device(sys.argv[1]))' "$device"
 exec gst-launch-1.0 -v videotestsrc is-live=true pattern=smpte \
   ! videoconvert ! video/x-raw,format=YUY2,width=1280,height=720,framerate=30/1 \
   ! v4l2sink device="$device" sync=false

@@ -1,4 +1,16 @@
-# Ubuntu one-command installer validation · 2026-10-10
+Installer update checks additionally exercise unchanged-commit skips without download/sudo/builds, annotated-tag resolution, recipe/platform/binary reuse and reversible app rollback. Full installer operations remain tested with a fake system; host privileged installation is pending.
+
+# AirPlay and removal of URL/QR validation · 2026-10-10
+
+This batch adds experimental UxPlay AirPlay reception and removes the browser client, HTTPS/WebRTC pairing host, QR-generating Rust shell, V1 installer/TLS helpers and obsolete dependencies/tests. Reusable V4L2 guards now live inside the receiver. Historical evidence below describes removed code and is not current compatibility evidence.
+
+- **46 current contracts/media tests**: default headless run passes 40 and skips six opt-in media tests. Real synthetic AirPlay H264/RTP portrait input passes, proving changing decoded frames, fixed 1280×720 canvas and black side borders. Receiver transform and Smart View RTP tests remain covered.
+- AirPlay contracts verify UxPlay version/options, Avahi checks without P2P/network mutations, failure cleanup, stale stream, loopback-only forwarding, ignored personal config, audio/recording disabled, real child teardown and first-frame waiting.
+- GTK/Xvfb checks mode visibility, AirPlay start without ADB selection, installer-selected adapter, crop and Stop/close. ShellCheck and compilation cover current code.
+- CI builds pinned UxPlay/MiracleCast on Ubuntu 24.04 and verifies actual AirPlay mDNS advertisement/owned-process teardown. Consult the associated successful run before treating that configuration as evidence.
+- **Still pending:** real iPhone/iPad/Mac authentication/negotiation/media, Galaxy/P2P, V4L2 kernel output/OBS, Ubuntu fresh installation/Secure Boot and Smart View network restoration. No physical phone or loopback nodes exist here. No host networking or system packages were changed by this development batch.
+
+# Archived Ubuntu installer validation before AirPlay removal · 2026-10-10
 
 The maintainer explicitly requested replacing the default installer now. `install.sh` installs V2 on Ubuntu 24.04/26.04; `install-v1.sh` preserves the previous Fedora implementation. It builds pinned MiracleCast unprivileged, installs fixed root-owned helpers/policy/license, provisions two named camera nodes and replaces the desktop/CLI launcher. Existing V1 configuration and receiver presets are preserved.
 
@@ -7,7 +19,7 @@ The maintainer explicitly requested replacing the default installer now. `instal
 - Real receiver synthetic-frame tests and GTK/Xvfb smoke passed after the launcher/adapter changes. The CI receiver job builds and stages pinned MiracleCast on Ubuntu 24.04; consult its actual run result before claiming build success.
 - **Still unverified:** fresh-host apt/DKMS setup, enabled Secure Boot enrollment/loading, real V4L2 provisioning on this Ubuntu host, Galaxy discovery/negotiation, broker network restoration and OBS streaming. The authoring adapter still lacks advertised P2P client/GO. No host network or system package/module settings were changed during this installer batch.
 
-# V2 validation · 2026-10-10
+# Archived V2 validation before AirPlay removal · 2026-10-10
 
 Current target: **Ubuntu + Samsung Smart View**. Status: experimental source prototype; hardware acceptance remains open.
 

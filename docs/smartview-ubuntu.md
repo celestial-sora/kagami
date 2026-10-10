@@ -16,7 +16,7 @@ The installer handles the dependencies, pinned MiracleCast build, root-owned hel
 
 ## Current machine blocker
 
-On this Ubuntu 26.04 authoring machine, `wlo1` uses `rtw88_8821ce`. `iw phy phy0 info` advertises managed/AP/monitor but **no P2P-client/P2P-GO modes**. Other mentions of P2P under TX/RX capabilities do not prove P2P interface support. Kagami rejects this adapter rather than claiming Smart View is ready. A P2P-capable adapter/driver is necessary. MiracleCast and decoder plugins are also not installed system-wide here.
+On this Ubuntu 26.04 authoring machine, `wlo1` uses `rtw88_8821ce`. `iw phy phy0 info` advertises managed/AP/monitor but **no P2P-client/P2P-GO modes**. Other mentions of P2P under TX/RX capabilities do not prove P2P interface support. Kagami rejects this adapter rather than claiming Smart View is ready. A P2P-capable driver/adapter is necessary. This machine previously used Miracast under Windows; the current Linux capability report does not prove the hardware itself is incapable. Evaluate Linux-driver alternatives before purchasing another adapter. MiracleCast and decoder plugins are also not installed system-wide here.
 
 Check the selected adapter without changing your network:
 

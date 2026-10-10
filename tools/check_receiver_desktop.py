@@ -4,7 +4,7 @@ from pathlib import Path
 import sys
 
 root = Path(__file__).resolve().parents[1]
-sys.path[:0] = [str(root / "apps/receiver"), str(root / "apps/host")]
+sys.path[:0] = [str(root / "apps/receiver")]
 from kagami_receiver.desktop import GLib, Gtk, Window
 from kagami_receiver.model import FrameFormat, OutputConfig
 
@@ -13,10 +13,27 @@ errors = []
 
 
 def activate(application):
-    window = Window(application, OutputConfig())
+    window = Window(application, OutputConfig(), "wlan2")
     window.present()
     def check():
         try:
+            assert window.interface.get_text() == "wlan2"
+            window.mode.set_selected(1)
+            assert window.transport_panels[1].get_visible()
+            assert not window.transport_panels[0].get_visible()
+            assert not window.device.get_visible()
+            # AirPlay must start without any ADB device; use a recording receiver.
+            starts = []
+            window.run_task = lambda task, complete: (task(), complete(None))
+            from kagami_receiver.controller import Receiver
+            from unittest.mock import patch
+            with patch.object(Receiver, "start", lambda _, transport: starts.append(transport)):
+                window.start_receiver(None)
+            assert len(starts) == 1 and starts[0].identity.connection == "airplay"
+            assert "Screen Mirroring" in window.status.get_text()
+            window.mode.set_selected(3)
+            assert window.transport_panels[2].get_visible()
+            assert window.device.get_visible()
             window.frame = FrameFormat(1080, 1920)
             window.drag_begin(None, 160, 80)
             window.drag_update(None, 200, 180)

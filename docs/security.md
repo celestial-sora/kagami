@@ -1,14 +1,9 @@
-# Prototype security boundary
+# Runtime permissions and privacy
 
-- The host binds one explicit local IPv4 address and uses TLS 1.2 or later. It never runs the GUI as root.
-- Pairing uses a random 256-bit secret, a five-minute TTL, one-time exchange and bounded per-address rate limiting.
-- Signaling requires the exact configured Origin and the secure session cookie. One active sender owns the media receiver; a second connection is rejected.
-- Expired sessions close their WebSocket. Teardown completes before the sender slot is released, protecting the next connection from an old disconnect.
-- Only one versioned video offer is accepted per connection. Messages and candidate queues have size limits. Audio tracks and multiple video tracks are excluded from this spike.
-- The static router serves only the camera HTML, CSS and JavaScript. Private configuration, CA keys and source directories are never published by the service.
-- No recordings, telemetry, external model downloads, public STUN/TURN, CDN requests, hosted accounts or relay infrastructure are implemented.
-- The V4L2 writer checks the selected device identity before opening a media pipeline.
+Kagami never runs its GUI/media as root. The V4L2 guard verifies loopback driver and Kagami label before opening either node; device locks prevent competing Kagami writers. Provisioning preflights both slots and never unloads another camera.
 
-The local CA is a manual development bootstrap, not solved zero-setup onboarding. Keep its keys private and validate phone trust on each supported platform before announcing compatibility. The native QR/pairing URL is sensitive local UI/IPC; do not paste it into public logs or screenshots while active.
+Smart View's fixed root-owned helper manages only the explicitly selected adapter after user consent, restoring management on EOF. AirPlay runs as an owned user process over the same LAN, with a loopback-only decoded-video bridge. Personal UxPlay startup options are ignored to prevent recording/pipeline overrides. ADB requires normal Android authorization and explicit pairing/connection.
 
-This is an initial boundary implementation, not an independent security audit. Physical TLS trust, ICE/firewall behavior and native packaging need validation before release.
+No browser URL/QR pairing server remains. Screen content is not saved by default. Preview queues/logs are bounded; only explicitly saved crop settings are stored. AirPlay audio is disabled. Protected app surfaces may be black. Use sender-side approval prompts and a trusted local network; custom firewalls should scope receiver ports to that network/interface.
+
+Stop/close terminate owned capture children and decoding; disconnect leaves black output until explicit reconnect/Stop. Physical phone, network-restoration and kernel-camera acceptance remain pending. See [validation](validation.md).

@@ -31,3 +31,7 @@ ffplay -f v4l2 -i /dev/video10
 ```
 
 Keep screen recordings/screenshots off by default; collect only consented test content. Android dialogs and protected surfaces must not be bypassed. Miracast/Smart View and Google Cast acceptance are separate future investigations, not USB milestones.
+
+## AirPlay hardware acceptance (pending)
+
+On the same LAN, verify iPhone/iPad/Mac discovery, authentication, actual mirrored frames in the preview and Kagami Virtual Camera in OBS. Try crop, stop/restart and portrait/landscape changes. Input is normalized to a fixed canvas; stop and restart reception, then reapply framing after rotation. Verify disconnect creates a black output slate, Stop removes the AirPlay advertisement/owned process and no recording files are created. Synthetic H264/RTP and mDNS smoke tests do not substitute for these device checks. Native Galaxy Smart View uses the separate Miracast mode.

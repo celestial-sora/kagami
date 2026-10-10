@@ -12,7 +12,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path[:0] = [str(ROOT / "apps/receiver"), str(ROOT / "apps/host")]
+sys.path[:0] = [str(ROOT / "apps/receiver")]
 from kagami_receiver.model import Crop, FrameFormat, Framing, OutputConfig, Presets, ReceiverError, centered_crop, content_rect, drag_crop
 from kagami_receiver.transport import Device, ScrcpyTransport, endpoint, pair, parse_devices, scrcpy_capabilities
 

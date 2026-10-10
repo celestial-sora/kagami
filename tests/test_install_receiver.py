@@ -10,6 +10,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 from install_receiver import camera_numbers, prepare, write_launchers
+from manage_versions import activate, rollback, versions
 
 
 def shell(script, **env):
@@ -31,15 +32,18 @@ kagami_install_dependencies() { :; }
 kagami_camera_module() { :; }
 kagami_secure_boot() { [[ $KAGAMI_TEST_MODE != mok-pending ]] || return 10; }
 kagami_install_miraclecast() { :; }
+kagami_install_airplay() { :; }
 sudo() { printf '%s\\n' "$*" >> "$KAGAMI_TEST_BASE/calls"; }
 git() {
     case $* in
         init*) mkdir -p "$3"; cp -a "$KAGAMI_TEST_REPO/apps" "$KAGAMI_TEST_REPO/tools" "$KAGAMI_TEST_REPO/docs" "$KAGAMI_TEST_REPO/README.md" "$KAGAMI_TEST_REPO/LICENSE" "$3/" ;;
-        *rev-parse*) printf 'testsha\\n' ;;
+        *ls-remote*) printf '%s\\trefs/heads/main\\n' "$KAGAMI_TEST_SHA" ;;
+        *rev-parse*) printf '%s\\n' "$KAGAMI_TEST_SHA" ;;
     esac
 }
 python3() {
-    if [[ $1 == - && $# == 2 ]]; then command python3 "$@";
+    if [[ $1 == */manage_versions.py ]]; then command python3 "$@";
+    elif [[ $1 == - && $# == 2 ]]; then command python3 "$@";
     elif [[ $1 == - ]]; then cat > /dev/null; return 0;
     elif [[ $2 == prepare ]]; then
         printf '{"output":"/dev/video10","source":"/dev/video11","interface":"wlan2"}\\n';
@@ -49,18 +53,94 @@ python3() {
     else return 99; fi
 }
 kagami_main
-''', KAGAMI_TEST_MODE=mode, KAGAMI_TEST_BASE=str(base), KAGAMI_TEST_REPO=str(ROOT),
+''', KAGAMI_TEST_MODE=mode, KAGAMI_TEST_BASE=str(base), KAGAMI_TEST_REPO=str(ROOT), KAGAMI_TEST_SHA="a" * 40,
                                XDG_DATA_HOME=str(base / "data"), XDG_CONFIG_HOME=str(base / "config"),
                                TMPDIR=str(base))
                 self.assertEqual(result.returncode, expected, result.stderr)
                 activated = mode != "software-failed"
                 self.assertEqual((base / "launcher").exists(), activated)
-                self.assertEqual((root / "current").resolve().name.startswith("v2-testsha-"), activated)
+                self.assertEqual((root / "current").resolve().name.startswith("v2-" + "a" * 40 + "-"), activated)
                 self.assertTrue((root / "versions/old").exists())
                 calls = (base / "calls").read_text()
                 self.assertEqual("restart kagami-receiver-camera.service" in calls, mode != "mok-pending")
                 self.assertNotIn("NetworkManager", calls)
                 self.assertFalse(list(base.glob("kagami-install.*")))
+
+    def test_same_commit_skips_download_packages_and_backends(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "data/kagami"
+            target = root / ("versions/v2-" + "a" * 40 + "-" + os.uname().machine)
+            (target / "tools").mkdir(parents=True)
+            (target / "VERSION").write_text("a" * 40 + "\n")
+            (target / "tools/run-receiver.sh").touch()
+            (root / "current").symlink_to(target)
+            result = shell('''
+kagami_platform() { :; }
+kagami_resolve_ref() { printf '%s\\n' "$KAGAMI_TEST_SHA"; }
+kagami_install_dependencies() { return 99; }
+kagami_install_miraclecast() { return 99; }
+kagami_install_airplay() { return 99; }
+git() { return 99; }
+sudo() { return 99; }
+kagami_main
+''', XDG_DATA_HOME=str(Path(temporary) / "data"), XDG_CONFIG_HOME=str(Path(temporary) / "config"),
+                           KAGAMI_TEST_SHA="a" * 40)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("Already installed", result.stdout)
+            self.assertFalse(list(Path(temporary).glob("kagami-install.*")))
+            self.assertEqual((root / "current").resolve(), target)
+
+    def test_remote_ref_resolves_annotated_tags_to_commit(self):
+        result = shell('''
+git() { printf '%s\\trefs/tags/v2.0.0\\n%s\\trefs/tags/v2.0.0^{}\\n' "$KAGAMI_TEST_TAG" "$KAGAMI_TEST_SHA"; }
+kagami_resolve_ref v2.0.0
+''', KAGAMI_TEST_SHA="a" * 40, KAGAMI_TEST_TAG="b" * 40)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "a" * 40)
+        result = shell('git() { return 1; }\nkagami_resolve_ref missing')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Cannot resolve", result.stderr)
+
+    def test_backend_reuse_requires_recipe_platform_and_usable_binary(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            recipe, marker, binary = (base / name for name in ("recipe", "BUILD", "backend"))
+            recipe.write_text("pinned recipe")
+            binary.write_text("#!/bin/sh\nexit 0\n")
+            binary.chmod(0o755)
+            script = 'kagami_backend_is_current "$KAGAMI_TEST_MARKER" "$KAGAMI_TEST_RECIPE" "$KAGAMI_TEST_BINARY"'
+            env = dict(KAGAMI_TEST_MARKER=str(marker), KAGAMI_TEST_RECIPE=str(recipe), KAGAMI_TEST_BINARY=str(binary))
+            result = shell('kagami_backend_stamp "$KAGAMI_TEST_RECIPE"', **env)
+            marker.write_text(result.stdout)
+            self.assertEqual(shell(script, **env).returncode, 0)
+            recipe.write_text("new pinned recipe")
+            self.assertNotEqual(shell(script, **env).returncode, 0)
+            marker.write_text(shell('kagami_backend_stamp "$KAGAMI_TEST_RECIPE"', **env).stdout)
+            binary.write_text("#!/bin/sh\nexit 1\n")
+            self.assertNotEqual(shell(script, **env).returncode, 0)
+            binary.write_text("#!/bin/sh\nexit 0\n")
+            self.assertNotEqual(shell(script, **env, VERSION_ID="different").returncode, 0)
+
+    def test_application_rollback_preserves_versions_and_rejects_external_targets(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "kagami"
+            targets = []
+            for sha in ("a" * 40, "b" * 40):
+                target = root / ("versions/v2-" + sha + "-x86_64")
+                (target / "tools").mkdir(parents=True)
+                (target / "VERSION").write_text(sha)
+                (target / "tools/run-receiver.sh").touch()
+                targets.append(target)
+            activate(root, targets[0]); activate(root, targets[1])
+            self.assertEqual((root / "previous").resolve(), targets[0])
+            self.assertIn("[current]", "\n".join(versions(root)))
+            self.assertEqual(rollback(root), targets[0])
+            self.assertEqual((root / "previous").resolve(), targets[1])
+            self.assertEqual(rollback(root), targets[1])
+            self.assertTrue(all(target.exists() for target in targets))
+            with self.assertRaises(ValueError):
+                activate(root, Path(temporary))
+            self.assertEqual((root / "current").resolve(), targets[1])
 
     def test_piped_dry_run_performs_no_download_or_privileged_calls(self):
         with tempfile.TemporaryDirectory() as temporary:

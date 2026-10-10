@@ -9,7 +9,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path[:0] = [str(ROOT / "apps/receiver"), str(ROOT / "apps/host")]
+sys.path[:0] = [str(ROOT / "apps/receiver")]
 from kagami_receiver.model import ReceiverError
 from kagami_receiver.smartview import SmartViewTransport, interface_modes, interface_name, media_description, preflight
 

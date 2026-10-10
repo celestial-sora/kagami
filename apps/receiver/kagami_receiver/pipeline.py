@@ -6,7 +6,7 @@ import struct
 import threading
 import time
 
-from kagami_host.v4l2 import CAPABILITY, VIDIOC_QUERYCAP, query_device
+from kagami_receiver.v4l2 import CAPABILITY, VIDIOC_QUERYCAP, query_device
 from .model import FrameFormat, ReceiverError
 
 QUEUE = "queue leaky=downstream max-size-buffers=2 max-size-bytes=0 max-size-time=0"

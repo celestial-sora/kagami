@@ -8,10 +8,17 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path[:0] = [str(ROOT / "apps/receiver"), str(ROOT / "apps/host")]
+sys.path[:0] = [str(ROOT / "apps/receiver")]
 from kagami_receiver.model import OutputConfig
 from kagami_receiver.smartview import interface_modes, interface_name
-from install_launchers import desktop_quote
+
+
+def desktop_quote(value):
+    value = str(value)
+    if any(char in value for char in ("\n", "\r", "\0")):
+        raise ValueError("Launcher paths cannot contain control characters.")
+    value = value.replace("\\", "\\\\").replace('"', '\\"').replace("`", "\\`").replace("$", "\\$")
+    return '"' + value.replace("\\", "\\\\").replace("%", "%%") + '"'
 
 
 def camera_numbers(settings=None, *, devices=Path("/dev"), names=Path("/sys/class/video4linux")):
@@ -93,6 +100,10 @@ def write_launchers(root, config, data, *, home=None):
     launcher.write_text("#!/bin/sh\nset -eu\n"
                         'if [ "$(id -u)" = 0 ]; then echo "Run Kagami as your desktop user." >&2; exit 2; fi\n'
                         "export KAGAMI_PYTHON=/usr/bin/python3\n"
+                        'case "${1:-}" in\n'
+                        f"  rollback|versions) exec /usr/bin/python3 {shlex.quote(str(root / 'manage_versions.py'))} "
+                        f'--root {shlex.quote(str(root))} "$1" ;;\n'
+                        'esac\n'
                         f"exec /bin/sh {shlex.quote(str(root / 'current/tools/run-receiver.sh'))} "
                         + shlex.join(args) + ' "$@"\n', encoding="utf-8")
     launcher.chmod(0o755)
@@ -123,8 +134,10 @@ if __name__ == "__main__":
         gi.require_foreign("cairo")
         from gi.repository import Gtk
         from kagami_receiver.smartview import preflight
+        from kagami_receiver.airplay import preflight as airplay_preflight
         settings = json.loads(args.config.read_text())
         checks = preflight(settings["interface"])
+        checks.extend(airplay_preflight())
         checks.append({"name": "gtk4", "ok": (Gtk.get_major_version(), Gtk.get_minor_version()) >= (4, 8), "detail": "GTK4 + Cairo"})
         print(json.dumps({"checks": checks, "samsung_interoperability": "physical Galaxy test pending"}))
         sys.exit(2 if any(not c["ok"] for c in checks if c["name"] != "wifi_direct") else

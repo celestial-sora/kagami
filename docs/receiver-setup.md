@@ -15,7 +15,7 @@ sudo dnf install python3 python3-gobject python3-cairo python3-gstreamer1 gtk4 \
 
 If your enabled repositories do not provide `scrcpy`, use the [official Linux installation instructions](https://github.com/Genymobile/scrcpy/blob/master/doc/linux.md). Do not assume an arbitrary binary supports V4L2: Kagami checks the installed version and help flags. Require scrcpy 3.0+, GStreamer 1.22+ and GTK4 4.8+. This path uses software-decoded raw frames and does not promise hardware acceleration.
 
-Install/build `v4l2loopback` for the running Fedora kernel using the proven [V1 module preparation guidance](installation-v1.md). The historical `install-v1.sh` prepares Fedora modules and installs the legacy HTTPS app; the default `install.sh` now installs V2 on Ubuntu. Do not unload a loaded loopback module to make room for V2.
+Install/build `v4l2loopback` for the running kernel using the distribution’s signed module/DKMS packaging. The default `install.sh` automates the Ubuntu receiver setup. Do not unload a loaded loopback module to make room for V2.
 
 ## Two named camera nodes
 
