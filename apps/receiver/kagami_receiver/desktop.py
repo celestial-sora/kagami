@@ -2,6 +2,7 @@
 
 import signal
 import threading
+from pathlib import Path
 
 import gi
 gi.require_version("Gtk", "4.0")
@@ -21,6 +22,8 @@ class Window(Gtk.ApplicationWindow):
     def __init__(self, app, config, interface="wlo1", preferred_transport="smartview", *, settings=None,
                  preferences=None, settings_error=None):
         super().__init__(application=app, title="Kagami · 鏡", default_width=1040, default_height=800)
+        Gtk.IconTheme.get_for_display(self.get_display()).add_search_path(str(Path(__file__).resolve().parent / "icons"))
+        self.set_icon_name("io.kagami.Host")
         self.settings = settings or Settings()
         self.save_timer = None
         if preferences is None:
@@ -464,6 +467,6 @@ class Window(Gtk.ApplicationWindow):
 
 
 def run(config, interface="wlo1", preferred_transport="smartview", **settings):
-    app = Gtk.Application(application_id="io.kagami.Receiver")
+    app = Gtk.Application(application_id="io.kagami.Host")
     app.connect("activate", lambda app: Window(app, config, interface, preferred_transport, **settings).present() if not app.get_active_window() else app.get_active_window().present())
     return app.run([])

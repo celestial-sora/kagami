@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="apps/receiver/kagami_receiver/icons/hicolor/256x256/apps/io.kagami.Host.png" width="128" height="128" alt="Kagami app icon">
+
 # Kagami · 鏡
 
 **Your phone screen, now a virtual camera for Linux.**

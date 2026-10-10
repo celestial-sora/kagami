@@ -47,6 +47,7 @@ Run the same curl command to update. The application is versioned by Git SHA/arc
 | Version switch helper | `~/.local/share/kagami/manage_versions.py` |
 | App versions / active version | `~/.local/share/kagami/versions/v2-…` / `current` |
 | CLI / desktop launcher | `~/.local/bin/kagami` / `~/.local/share/applications/io.kagami.Host.desktop` |
+| App icons | `~/.local/share/icons/hicolor/…/apps/io.kagami.Host.png` |
 | Installation settings | `~/.config/kagami/receiver-install.json` |
 | Crop presets | `~/.config/kagami/receiver-presets.json` |
 | Fixed root helpers | `/usr/local/libexec/kagami-{camera-setup,receiver-camera-setup,smartview-helper,smartview-session}` |

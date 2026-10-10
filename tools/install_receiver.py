@@ -4,6 +4,7 @@ import argparse
 import json
 from pathlib import Path
 import shlex
+import shutil
 import subprocess
 import sys
 
@@ -129,6 +130,12 @@ os.execv("/bin/sh", ["/bin/sh", sys.argv[2], *args, *sys.argv[3:]])
 '''
     launcher.parent.mkdir(parents=True, exist_ok=True)
     desktop.parent.mkdir(parents=True, exist_ok=True)
+    icons = data / "icons/hicolor"
+    shutil.copytree(ROOT / "apps/receiver/kagami_receiver/icons/hicolor", icons, dirs_exist_ok=True)
+    icon_cache = shutil.which("gtk-update-icon-cache")
+    if icon_cache:
+        subprocess.run([icon_cache, "--force", "--ignore-theme-index", str(icons)],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
     launcher.write_text("#!/bin/sh\nset -eu\n"
                         'if [ "$(id -u)" = 0 ]; then echo "Run Kagami as your desktop user." >&2; exit 2; fi\n'
                         "export KAGAMI_PYTHON=/usr/bin/python3\n"
@@ -142,7 +149,7 @@ os.execv("/bin/sh", ["/bin/sh", sys.argv[2], *args, *sys.argv[3:]])
     launcher.chmod(0o755)
     desktop.write_text("[Desktop Entry]\nType=Application\nName=Kagami\n"
                        "Comment=Phone screen to virtual camera\n"
-                       f"Exec={command}\nIcon=camera-video\nTerminal=false\n"
+                       f"Exec={command}\nIcon=io.kagami.Host\nTerminal=false\n"
                        "Categories=AudioVideo;Video;\nStartupNotify=true\n", encoding="utf-8")
     return launcher, desktop
 
