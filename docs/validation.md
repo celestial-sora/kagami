@@ -1,3 +1,17 @@
+# Authorized Ubuntu 26.04 AirPlay installation · 2026-10-10
+
+The maintainer explicitly authorized running the curl installer and correcting real failures while keeping AirPlay installable without P2P.
+
+- Original main a71f0d8 failed building pinned UxPlay on GCC 15.2: video_renderer.c called printf without stdio.h. The fixed build adds only that missing declaration; normal compiler diagnostics remain enabled.
+- Fixed feature d8e28d4 installs successfully on the actual Ubuntu 26.04 desktop with exit **0**, despite RTL8821CE/rtw88_8821ce lacking P2P-client/P2P-GO. AirPlay is available, Smart View is optional/unavailable, and the saved preferred transport is AirPlay.
+- The installer reused unchanged installed MiracleCast, built UxPlay successfully, verified matching v4l2loopback module vermagic for 7.0.0-38-generic, and enabled/started the camera service. Secure Boot is disabled on this host; enabled-Secure-Boot acceptance remains pending.
+- Named video10/video11 nodes pass the unprivileged identity guard. AirPlay doctor passes backend/discovery/decoder checks. The installed headless AirPlay receiver starts and stops normally with fatal criticals enabled and reaps its owned UxPlay child.
+- A separate real V4L2 consumer reads five complete 1280x720 YUY2 black waiting frames from video10 while AirPlay listens. Frames stay in memory; no screen/media files are saved. This verifies waiting camera output, not actual Apple mirroring or OBS.
+- All **52** contracts/media tests pass on the host. GTK/Xvfb verifies the initial AirPlay choice and controls; ShellCheck and compilation pass. [Feature CI 38034703869](https://github.com/celestial-sora/kagami/actions/runs/38034703869) passes all three jobs, including actual UxPlay/MiracleCast builds and Avahi discovery/teardown.
+- Still pending: physical Apple authentication/negotiation/media, Galaxy/P2P/network restoration, OBS/Discord, enabled Secure Boot and post-reboot service acceptance. Host Wi-Fi management was not handed to MiracleCast.
+
+Earlier records below are historical evidence from their stated batches.
+
 Installer update checks additionally exercise unchanged-commit skips without download/sudo/builds, annotated-tag resolution, recipe/platform/binary reuse and reversible app rollback. Full installer operations remain tested with a fake system; host privileged installation is pending.
 
 # AirPlay and removal of URL/QR validation · 2026-10-10

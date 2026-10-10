@@ -6,4 +6,4 @@ The current installer builds pinned MiracleCast/UxPlay as the ordinary user and 
 
 The authoring host is Ubuntu 26.04, RTL8821CE [10ec:c821], driver rtw88_8821ce, lacking advertised P2P modes. Windows Miracast history narrows the present blocker to Linux-driver capabilities; no replacement-driver or host network changes were performed. AirPlay uses same-LAN Avahi and does not need P2P.
 
-Physical Apple/Galaxy, real V4L2/OBS, network restoration and fresh DKMS/Secure Boot acceptance remain open. See [validation](validation.md).
+The authorized Ubuntu 26.04 installer now passes with AirPlay despite missing P2P, including actual DKMS/module/camera setup and black waiting frames through video10. Physical Apple/Galaxy media, OBS, network restoration, enabled Secure Boot and post-reboot acceptance remain open. See [validation](validation.md).
