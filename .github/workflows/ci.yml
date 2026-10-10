@@ -1,7 +1,7 @@
 name: Checks
 on:
   push:
-    branches: [main]
+    branches: [main, feat/receiver-first-architecture]
     paths-ignore:
       - 'docs/**'
       - 'README.md'
@@ -27,10 +27,10 @@ jobs:
           python-version: '3.12'
       - run: python -m pip install -r apps/host/requirements.txt
       - run: python -m unittest discover -s tests -v
-      - run: python -m compileall -q apps/host tools
+      - run: python -m compileall -q apps/host apps/receiver tools
       - run: bash -n tools/test-pattern.sh
       - run: |
-          for script in install.sh packaging/fedora/kagami-camera-setup; do
+          for script in install.sh packaging/fedora/kagami-camera-setup packaging/fedora/kagami-receiver-camera-setup tools/run-receiver.sh; do
             bash -n "$script"
           done
   browser:
@@ -51,7 +51,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
       - run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libadwaita-1-dev pkg-config shellcheck desktop-file-utils
-      - run: shellcheck install.sh packaging/fedora/kagami-camera-setup tools/test-pattern.sh
+      - run: shellcheck install.sh packaging/fedora/kagami-camera-setup packaging/fedora/kagami-receiver-camera-setup packaging/ubuntu/kagami-smartview-session tools/test-pattern.sh tools/run-receiver.sh
       - run: |
           python3 tools/install_launchers.py --root /tmp/kagami --config /tmp/kagami/config.json --data /tmp/kagami-desktop
           desktop-file-validate /tmp/kagami-desktop/applications/io.kagami.Host.desktop
@@ -67,3 +67,16 @@ jobs:
           sudo apt-get install -y python3-gi python3-gst-1.0 gir1.2-gst-plugins-bad-1.0 gstreamer1.0-tools \
             gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-nice
       - run: G_DEBUG=fatal-criticals PYTHONPATH=apps/host /usr/bin/python3 tools/check_media_runtime.py
+  receiver:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-gi python3-gi-cairo python3-gst-1.0 gir1.2-gtk-4.0 \
+            gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
+            gstreamer1.0-plugins-ugly gstreamer1.0-libav xvfb
+      - run: G_DEBUG=fatal-criticals KAGAMI_TEST_GST=1 /usr/bin/python3 -m unittest discover -s tests -p test_receiver.py -v
+      - run: G_DEBUG=fatal-criticals xvfb-run -a /usr/bin/python3 tools/check_receiver_desktop.py
+      - run: G_DEBUG=fatal-criticals KAGAMI_TEST_GST=1 /usr/bin/python3 -m unittest discover -s tests -p test_smartview.py -v

@@ -1,3 +1,11 @@
+> **Maintainer update:** primary target is now **Ubuntu + Samsung Smart View**, ahead of USB. See [Smart View setup/status](smartview-ubuntu.md). The MiracleCast receiver prototype is integrated but physical Galaxy/P2P acceptance remains open; USB is a fallback. Earlier Fedora/USB rollout references below are historical context.
+
+# Current architecture: V2 receiver-first
+
+[Architecture v2](architecture-v2.md) is the current decision. [Migration audit](receiver-audit.md) describes the reference implementation and open hardware gates. The browser/WebRTC architecture below is retained V1 context.
+
+---
+
 # Phase 0 architecture
 
 ```mermaid

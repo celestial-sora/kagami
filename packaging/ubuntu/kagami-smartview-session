@@ -1,0 +1,4 @@
+#!/bin/sh
+# MiracleCast requires a live external-player process. Kagami's normal-user
+# GStreamer pipeline owns RTP/video instead; this process captures no media.
+exec /usr/bin/sleep infinity

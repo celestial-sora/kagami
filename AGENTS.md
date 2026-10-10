@@ -1,3 +1,27 @@
+# Current maintainer direction: Ubuntu + Samsung Smart View
+
+- The maintainer superseded Fedora/USB-first during this session: prioritize Samsung Smart View (Miracast sink) on Ubuntu. USB/authorized ADB Wi-Fi are fallback paths. Read docs/smartview-ubuntu.md.
+- Smart View is an experimental MiracleCast control + RTP/MP2T/H264 decode adapter. Do not claim Galaxy interoperability from synthetic tests.
+- Preflight only P2P-client/P2P-GO in the supported-interface-modes section of the selected PHY. P2P mentions in TX/RX lists are insufficient. Current authoring rtw88_8821ce does not advertise those modes.
+- A fixed root-owned broker manages only the explicitly selected adapter via polkit; GUI/media remain unprivileged. EOF restores management. Never silently stop global networking or create passwordless sudoers.
+- In Smart View mode require explicit consent for temporary selected-adapter disconnection. Test network restoration and real Galaxy discovery before advertising compatibility. No P2P-capable hardware is currently available.
+- No PR for this migration; use the GitHub connector/Codex agent for publishing and integrate main once after CI. Attribute the contributor as celestail-sora using the linked celestial-sora account.
+
+# Kagami V2 engineering context
+
+- Current direction is docs/architecture-v2.md and docs/implementation-plan.md. Read docs/handoff.md, docs/receiver-audit.md and docs/validation.md before work. Historical V1 constraints below apply only to the retained legacy path where they conflict with V2.
+- Prioritize Samsung Camera/TikTok visible screen → authorized ADB/scrcpy → shared crop/transform pipeline → real V4L2 output. No mandatory Android app, cloud/account, browser camera replacement or direct-camera substitution.
+- V2 reference native desktop is Python/GTK4/PyGObject; Rust V1 is preserved. Keep a tested media boundary before migrating language/toolkit internals.
+- Verify installed scrcpy version/help and use its documented V4L2 sink. Use two guarded named loopbacks. Never write into physical cameras or run the desktop as root.
+- Keep bounded frame queues, persistent output/slate on disconnect and reliable child teardown. Stop must release capture immediately. Do not save screen images/video by default.
+- Captured orientation is locked; crop settings are keyed by captured size and user-supplied app label. Do not promise automatic rotation/reconnect until implemented and tested.
+- Smart View/Miracast is unverified research; Google Cast is research-only. ADB Wi-Fi requires explicit pairing/connection on a trusted private network and must never silently replace USB.
+- Run legacy host/installer checks and receiver contract tests. Opt-in KAGAMI_TEST_GST=1 tests use real GStreamer with synthetic input; GTK smoke uses Xvfb. None proves Fedora/Android/OBS hardware acceptance.
+- install.sh remains V1. V2 curl packaging is deferred until hardware verification and dependable install paths. Use docs/receiver-setup.md for source setup.
+- The maintainer requests no PR for this migration; integrate after feature-branch CI and push main once. Contributor name requested: celestail-sora (or celestail-duck); GitHub account/repository owner is celestial-sora.
+
+## Retained V1 engineering context
+
 # Kagami engineering context
 
 - For a new engineering session, read docs/handoff.md alongside the implementation plan and current validation record; the handoff is a dated snapshot, not a substitute for fetching the latest code.

@@ -1,0 +1,105 @@
+#!/usr/bin/python3
+"""Root-owned MiracleCast network broker; media and UI stay unprivileged.
+
+Only an explicitly selected P2P adapter is handed to MiracleCast. EOF from
+the desktop restores its previous NetworkManager management state.
+"""
+import os
+from pathlib import Path
+import re
+import signal
+import subprocess
+import sys
+import time
+
+
+def run(args):
+    result = subprocess.run(args, check=True, capture_output=True, text=True, timeout=5)
+    return result.stdout.strip()
+
+
+def main():
+    if os.geteuid() != 0 or len(sys.argv) != 2:
+        raise ValueError("Run the installed network helper through Kagami/pkexec.")
+    interface = sys.argv[1]
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,14}", interface):
+        raise ValueError("Invalid Wi-Fi interface.")
+    os.environ["PATH"] = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    info = run(["iw", "dev", interface, "info"])
+    phy = re.search(r"\bwiphy\s+(\d+)", info)
+    if not phy:
+        raise ValueError("Selected device is not wireless.")
+    modes = re.search(r"Supported interface modes:\s*\n((?:\s*\*[^\n]+\n)+)", run(["iw", "phy", "phy" + phy[1], "info"]))
+    supported = set(re.findall(r"\*\s+(\S+)", modes[1])) if modes else set()
+    if not {"P2P-client", "P2P-GO"}.issubset(supported):
+        raise ValueError("Wi-Fi driver does not advertise P2P client/GO.")
+    for binary, required in (("miracle-wifid", ("--interface", "--lazy-managed")),
+                             ("miracle-sinkctl", ("--external-player", "--audio", "--res", "--port"))):
+        help_text = run([binary, "--help"])
+        if any(flag not in help_text for flag in required):
+            raise ValueError("Installed MiracleCast lacks required documented options.")
+    # Do not steal another receiver's daemon or touch other network interfaces.
+    owner = subprocess.run(["busctl", "--system", "status", "org.freedesktop.miracle.wifi"], capture_output=True, timeout=5)
+    if owner.returncode == 0:
+        raise ValueError("Another MiracleCast daemon is already running; stop it first.")
+    managed = run(["nmcli", "-g", "GENERAL.NM-MANAGED", "device", "show", interface])
+    was_connected = run(["nmcli", "-g", "GENERAL.STATE", "device", "show", interface]).startswith("100")
+    if managed not in ("yes", "no"):
+        raise ValueError("Cannot determine previous network management state.")
+    player = Path("/usr/local/libexec/kagami-smartview-session")
+    if not player.is_file() or player.stat().st_uid != 0 or player.stat().st_mode & 0o022:
+        raise ValueError("Install the root-owned Smart View session helper.")
+    link = (Path("/sys/class/net") / interface / "ifindex").read_text().strip()
+    if not link.isdecimal():
+        raise ValueError("Invalid wireless interface index.")
+    daemon = sink = None
+    try:
+        run(["nmcli", "device", "set", interface, "managed", "no"])
+        daemon = subprocess.Popen(["miracle-wifid", "--interface", interface, "--lazy-managed"], stdin=subprocess.DEVNULL)
+        for _ in range(30):
+            if daemon.poll() is not None:
+                raise RuntimeError("MiracleCast Wi-Fi daemon failed to start.")
+            status = subprocess.run(["busctl", "--system", "status", "org.freedesktop.miracle.wifi"], capture_output=True, timeout=1)
+            if status.returncode == 0:
+                break
+            time.sleep(.1)
+        else:
+            raise RuntimeError("MiracleCast D-Bus service did not become ready.")
+        # CEA mask 0x20: 1280x720@30. No UIBC or audio; this is screen mirroring.
+        sink = subprocess.Popen(["miracle-sinkctl", "--audio", "0", "--res", "20,0,0", "--port", "7236",
+                                 "--external-player", str(player)], stdin=subprocess.PIPE, text=True)
+        sink.stdin.write(f"set-managed {link} yes\nset-friendly-name {link} Kagami\nrun {link}\n")
+        sink.stdin.flush()
+        print("Kagami Smart View sink started. Select Kagami on the Galaxy; interoperability is experimental.", flush=True)
+        # Never let network children inherit this pipe; app exit must cause EOF.
+        while True:
+            import select
+            if sink.poll() is not None or daemon.poll() is not None:
+                raise RuntimeError("MiracleCast network process stopped.")
+            if select.select([sys.stdin], [], [], .5)[0] and not sys.stdin.buffer.read(1):
+                break
+    finally:
+        for child in (sink, daemon):
+            if child and child.poll() is None:
+                child.terminate()
+                try:
+                    child.wait(timeout=3)
+                except subprocess.TimeoutExpired:
+                    child.kill()
+                    child.wait(timeout=3)
+        run(["nmcli", "device", "set", interface, "managed", managed])
+        if managed == "yes" and was_connected:
+            # NetworkManager restores the user's prior autoconnect profile.
+            subprocess.run(["nmcli", "device", "connect", interface], capture_output=True, timeout=5)
+
+
+if __name__ == "__main__":
+    def interrupted(_signal, _frame):
+        raise SystemExit(0)
+    signal.signal(signal.SIGTERM, interrupted)
+    signal.signal(signal.SIGINT, interrupted)
+    try:
+        main()
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
+        print(str(exc), file=sys.stderr, flush=True)
+        sys.exit(2)

@@ -2,25 +2,30 @@
 # A narrowly scoped root helper: create one loopback, never unload any camera.
 set -euo pipefail
 number=${1:?A virtual camera number is required}
+label=${2:-Kagami Virtual Camera}
+if [[ $label != 'Kagami Virtual Camera' && $label != 'Kagami Screen Input' ]]; then
+    printf 'Invalid Kagami camera label\n' >&2
+    exit 2
+fi
 if [[ ! $number =~ ^(0|[1-9][0-9]{0,2})$ ]] || ((number > 255)); then
     printf 'Invalid virtual camera number\n' >&2
     exit 2
 fi
 if [[ -e /dev/video$number || -L /dev/video$number ]]; then
-    [[ $(cat "/sys/class/video4linux/video$number/name") == 'Kagami Virtual Camera' ]] || {
+    [[ $(cat "/sys/class/video4linux/video$number/name") == "$label" ]] || {
         printf 'Camera number %s is occupied; leaving that device untouched.\n' "$number" >&2
         exit 2
     }
     exit 0
 fi
 if [[ ! -d /sys/module/v4l2loopback ]]; then
-    modprobe v4l2loopback "video_nr=$number" 'card_label=Kagami Virtual Camera' exclusive_caps=1
+    modprobe v4l2loopback "video_nr=$number" "card_label=$label" exclusive_caps=1
 fi
 if [[ -e /dev/video$number || -L /dev/video$number ]]; then
-    [[ $(cat "/sys/class/video4linux/video$number/name") == 'Kagami Virtual Camera' ]] || {
+    [[ $(cat "/sys/class/video4linux/video$number/name") == "$label" ]] || {
         printf 'Camera number %s is occupied; leaving that device untouched.\n' "$number" >&2
         exit 2
     }
 else
-    v4l2loopback-ctl add -n 'Kagami Virtual Camera' -x 1 "/dev/video$number"
+    v4l2loopback-ctl add -n "$label" -x 1 "/dev/video$number"
 fi

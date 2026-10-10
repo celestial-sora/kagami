@@ -1,3 +1,20 @@
+# V2 validation · 2026-10-10
+
+Current target: **Ubuntu + Samsung Smart View**. Status: experimental source prototype; hardware acceptance remains open.
+
+- Fresh audited baseline: c8f0ff3; latest executable baseline [Actions 37951587540](https://github.com/celestial-sora/kagami/actions/runs/37951587540) passed. No baseline CI defect found.
+- All retained host/installer tests pass with aiohttp installed in a test-only runtime. Receiver contracts cover geometry, local presets, ADB authorization, explicit Wi-Fi mode, child reaping, ownership and writer persistence.
+- **22 receiver tests pass** under system Python 3.14/GStreamer 1.28.2 with KAGAMI_TEST_GST=1 and G_DEBUG=fatal-criticals. Synthetic RGBA inputs prove crop, every quarter-turn, mirror order, fit/fill, actual transformed YUY2 output, black fallback and writer retention across processing restart.
+- **8 Smart View tests pass**, including real local UDP RTP/MPEG-TS/H.264 moving-frame decoding. Broker/interface checks use mocks and do not prove actual P2P or network restoration.
+- Real GTK4 window/crop/Stop/close smoke check passes under Xvfb, with Cairo integration. ShellCheck and Python compilation pass. Dependencies for local GUI/decoder tests were extracted into ignored .local/qa; no system network/module configuration was changed.
+- Selected host adapter: wlo1 / phy0 / rtw88_8821ce; supported interface modes lack P2P-client/P2P-GO. smartview-doctor correctly rejects it. The current host also lacks installed MiracleCast/system TS parser plugins and /dev/video*.
+- **Unverified:** Galaxy discovery/connect, Samsung Camera/TikTok surfaces, real loopback writes, OBS/Discord, P2P/Wi-Fi stability, broker restoration on Ubuntu, Ubuntu DKMS/Secure Boot, actual FPS/latency and Fedora compatibility. There is no physical phone or P2P-capable adapter for this session.
+- V1 Rust/browser/media API and V2 Ubuntu-24.04 receiver checks are retained in GitHub CI; publication state is reported with the final delivery. A configured workflow is not evidence of a successful new run.
+
+The supplied architecture-v2.md is preserved verbatim. The maintainer's later Ubuntu/Smart View priority overrides its Fedora/USB rollout. V1 evidence below is preserved historical context.
+
+---
+
 # Validation record · 2026-10-09
 
 ## Fedora desktop checks

@@ -1,3 +1,5 @@
+> This document describes the retained **V1 browser bridge installer**. For the new screen-mirroring workflow use [V2 receiver setup](receiver-setup.md); `install.sh` has not yet been replaced.
+
 # One-command Fedora installation
 
 For DNF-based Fedora Workstation, run as your ordinary desktop user:

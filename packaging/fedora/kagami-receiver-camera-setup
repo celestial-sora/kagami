@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Provision two identified loopbacks, without unloading/replacing any device.
+set -euo pipefail
+output=${1:-10}
+input=${2:-11}
+for number in "$output" "$input"; do
+    if [[ ! $number =~ ^(0|[1-9][0-9]{0,2})$ ]] || ((number > 255)); then
+        printf 'Invalid virtual camera number\n' >&2
+        exit 2
+    fi
+done
+if [[ $input == "$output" ]]; then
+    printf 'Receiver input and output need different device numbers\n' >&2
+    exit 2
+fi
+# Check both slots before creating anything. Never write into physical cameras.
+for number in "$output" "$input"; do
+    expected='Kagami Virtual Camera'
+    [[ $number != "$input" ]] || expected='Kagami Screen Input'
+    if [[ -e /dev/video$number || -L /dev/video$number ]]; then
+        if [[ $(cat "/sys/class/video4linux/video$number/name") != "$expected" ]]; then
+            printf 'Camera slot %s is occupied; leaving it untouched.\n' "$number" >&2
+            exit 2
+        fi
+    fi
+done
+kagami_helper_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+bash "$kagami_helper_dir/kagami-camera-setup" "$output" 'Kagami Virtual Camera'
+bash "$kagami_helper_dir/kagami-camera-setup" "$input" 'Kagami Screen Input'

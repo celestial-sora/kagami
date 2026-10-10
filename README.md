@@ -1,83 +1,60 @@
 # Kagami · 鏡
 
-A local phone camera bridge for Linux. Your phone sends video; your computer exposes **Kagami Virtual Camera** as a real V4L2 device for OBS.
+Turn the **screen of your Android phone** into a real Linux virtual camera. Open Samsung Camera, TikTok effects, or any screen app; Kagami mirrors what it displays, crops the useful region, and publishes it to OBS/Discord through V4L2.
 
-**Current state: Phase 0 source prototype, hardware acceptance pending.** The HTTPS/pairing service has automated tests. The GStreamer receiver and native Rust shell require the checks below on a Linux machine. This is not a completed v0.1 release.
+**Primary target: Ubuntu + Samsung Smart View. V2 is an experimental source implementation; physical Galaxy/OBS acceptance pending.** No Android Kagami app, account, TLS setup, cloud relay, or browser camera client is needed for the V2 workflow.
 
-## Install on Fedora
+## Run V2
+
+Start with [Ubuntu Smart View setup](docs/smartview-ubuntu.md), including P2P hardware checks and **two** Kagami loopbacks. USB/ADB fallback setup remains in [receiver setup](docs/receiver-setup.md). Then, as your desktop user:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/celestial-sora/kagami/main/install.sh | bash
+bash tools/run-receiver.sh smartview-doctor --interface wlo1
+bash tools/run-receiver.sh
 ```
 
-Run as your desktop user. The installer handles dependencies, virtual-camera setup, native build, configuration, TLS and an application-menu launcher. See [installation](docs/installation.md) for Secure Boot enrollment, updates and exact scope. Android certificate trust and camera permission remain first-time phone actions.
+1. Choose **Samsung Smart View**, select a P2P-capable Wi-Fi adapter, and run Check Smart View.
+2. Confirm that adapter may disconnect, then Start. The fixed network helper may request polkit authentication; the GUI/media stay unprivileged.
+3. On the Galaxy open **Smart View → Kagami**, accept the phone prompt, then open Samsung Camera.
+4. Drag/apply a crop over the useful preview and select **Kagami Virtual Camera** in OBS (default `/dev/video10`). `/dev/video11` is the intermediate screen input.
+5. Stop from Kagami; the broker restores the adapter's previous network management. This lifecycle is not yet hardware-verified.
 
-## Manual developer setup
+This machine's `rtw88_8821ce` driver does not advertise P2P-client/P2P-GO, so real Smart View is blocked until compatible hardware/driver is available. Kagami reports that explicitly. USB Mirror and authorized Wi-Fi ADB Mirror remain selectable fallback paths.
 
-Follow [Fedora setup](docs/fedora-setup.md) for system packages and the one-time virtual camera setup. Then:
+The native GTK4 reference desktop and GStreamer pipeline currently use Python/PyGObject. The original Rust GTK/libadwaita shell is preserved as V1. A Rust media migration is deferred until the new hardware path is proven.
 
-1. Copy `config.example.json` to `config.json`. Set `host` to the computer's reachable Wi-Fi or USB IPv4 address. TLS paths are relative to this file.
-2. Create host certificates for that address:
-
-   ```bash
-   python3 tools/create_tls.py --host 192.168.1.50
-   ```
-
-3. Transfer **only** `.local/tls/ca.pem` to your phone through a trusted local channel. Follow [pairing and TLS](docs/pairing-and-tls.md); the browser must trust the certificate before it can use the camera.
-4. Check the host:
-
-   ```bash
-   PYTHONPATH=apps/host python3 -m kagami_host doctor --config config.json
-   ```
-
-5. Start the reference host or native shell:
-
-   ```bash
-   PYTHONPATH=apps/host python3 -m kagami_host --config config.json
-   ```
-
-   ```bash
-   cargo run -p kagami-linux
-   ```
-
-6. Open the pairing URL or scan the native window's QR code on your phone, then press **Start camera**.
-7. In OBS, add **Video Capture Device (V4L2)** and select **Kagami Virtual Camera**.
-
-The `192.168.1.50` address above is an example. Use your computer's actual address. `127.0.0.1` is only for local developer checks and cannot pair a separate phone.
-
-## What is implemented
-
-- HTTPS host with one-time pairing, an expiring secure session, Origin validation and one active sender.
-- Offline phone client: camera permission, preview, front/rear request, 720p/1080p capture presets, preview mirroring and teardown/reconnect.
-- GStreamer reference receive path: WebRTC VP8 → decoded I420 → fixed-size YUY2 → `v4l2sink`.
-- Persistent output pipeline with a no-signal slate and bounded queues between phone sessions.
-- Read-only environment diagnostics and a guarded V4L2 test-pattern command.
-- Rust GTK4/libadwaita native shell for helper start/stop, QR pairing and frame diagnostics.
-
-## Important scope
-
-Phase 0 uses Python/PyGObject to expose the media spike while the native shell is Rust. This is an explicit integration seam, **not the final Rust media architecture**. Once the [hardware acceptance](docs/testing.md) passes, migrate the validated pipeline into `gstreamer-rs` and complete native preview/interface selection.
-
-The current video codec is **VP8 only** for a small reproducible baseline. H.264/hardware acceleration, Kagami Focus, Android MediaProjection, audio, iOS, RPM/AppImage packaging and automatic certificate renewal remain later milestones. Android sources have not been fabricated before the Phase 0 gate passes.
-
-CI passes 31 Python host/installer tests, seven Chromium synthetic-camera scenarios, a native release build, and real GStreamer plugin/ICE API and teardown checks. A real Fedora installer rerun prepares three kernel modules and loads the camera on the running kernel without reboot. Native window startup, V4L2 test frames and reference-host no-signal output also pass. The physical Android → GStreamer → V4L2 → OBS streaming path remains unverified. Consult [validation status](docs/validation.md) for exact evidence and limitations.
-
-## Developer checks
+For headless use:
 
 ```bash
-python3 -m pip install -r apps/host/requirements.txt
+bash tools/run-receiver.sh devices
+bash tools/run-receiver.sh mirror --serial YOUR_ADB_SERIAL --crop 0.1,0.15,0.8,0.6 --output /dev/video10 --source /dev/video11
+```
+
+Wi-Fi uses **authorized Android Wireless debugging**, with explicit Pair/Connect controls in the desktop. See [setup](docs/receiver-setup.md) for CLI commands and connection diagnostics. Kagami never switches from USB to a network automatically.
+
+## Capabilities and limits
+
+- USB and Wi-Fi scrcpy screen-mirror adapters share crop/rotation/mirror/scaling/FPS processing and a persistent YUY2 camera writer.
+- scrcpy **3.0+**, installed help flags and Linux V4L2 support are checked at runtime. Only documented `--v4l2-sink` output is used.
+- Smart View/Miracast has an integrated MiracleCast prototype and synthetic H.264/RTP decoder test, with Galaxy/P2P interoperability still unverified. Google Cast remains research-only.
+- Crop removes UI outside the rectangle. Overlays inside it remain. Protected surfaces may be black. Third-party effects only survive when the phone app allows screen mirroring.
+- In USB/ADB modes capture orientation is locked when connecting because the intermediate V4L2 sink needs stable dimensions. Stop, rotate the phone, and reconnect; saved crops are keyed by captured size. Output rotation is independent.
+- FPS, rate adjustments and approximate host timestamp age are visible. Transport drops and glass-to-glass latency remain unknown until measured.
+- No screen images or video are saved by default. Only explicitly saved framing settings are written locally.
+
+## Validation
+
+```bash
+python3 -m pip install -r apps/host/requirements.txt  # retained V1 test dependencies
 python3 -m unittest discover -s tests -v
-node --check apps/web-client/app.js
-npm install
-npx playwright install chromium
-npm run test:browser
-cargo check --workspace
+KAGAMI_TEST_GST=1 G_DEBUG=fatal-criticals python3 -m unittest discover -s tests -p test_receiver.py -v
+xvfb-run -a python3 tools/check_receiver_desktop.py
 ```
 
-Browser tests use a synthetic Chromium camera and a browser-local signaling fixture. Host tests use real TLS/HTTP/WebSocket transports with a recording media test double. Neither suite substitutes for V4L2/OBS hardware testing.
+CI keeps V1 host/browser/native/media checks and adds real synthetic raw-frame GStreamer and GTK smoke checks. These do not prove a real phone, kernel camera output or OBS. Follow [hardware testing](docs/receiver-testing.md) and [validation evidence](docs/validation.md).
 
-Read [architecture](docs/architecture.md), [USB networking](docs/usb-tethering.md), [security](docs/security.md), [troubleshooting](docs/troubleshooting.md), and the supplied [implementation plan](docs/implementation-plan.md).
+The original browser bridge and its existing curl installer remain available in [V1 documentation](README_V1.md); `install.sh` still installs **V1**, not V2. The V2 one-command installer is deferred until the hardware acceptance and install paths are dependable.
 
-## License
+Read [Architecture v2](docs/architecture-v2.md), [implementation plan](docs/implementation-plan.md), [migration audit](docs/receiver-audit.md) and [handoff](docs/handoff.md).
 
-MIT for Kagami source. System dependencies, including GStreamer, GTK and v4l2loopback, retain their own licenses.
+MIT for Kagami source; dependencies retain their own licenses.
