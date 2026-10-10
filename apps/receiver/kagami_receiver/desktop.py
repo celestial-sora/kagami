@@ -14,14 +14,27 @@ from .model import Crop, Framing, OutputConfig, Presets, content_rect, drag_crop
 from .transport import ScrcpyTransport, connect, devices, pair
 from .smartview import SmartViewTransport, preflight
 from .airplay import AirPlayTransport, preflight as airplay_preflight
+from .settings import DesktopPreferences, Settings, TRANSPORTS
 
 
 class Window(Gtk.ApplicationWindow):
-    def __init__(self, app, config, interface="wlo1", preferred_transport="smartview"):
+    def __init__(self, app, config, interface="wlo1", preferred_transport="smartview", *, settings=None,
+                 preferences=None, settings_error=None):
         super().__init__(application=app, title="Kagami · 鏡", default_width=1040, default_height=800)
+        self.settings = settings or Settings()
+        self.save_timer = None
+        if preferences is None:
+            preferences = DesktopPreferences(config, interface, preferred_transport)
+            try:
+                preferences = self.settings.load(preferences)
+            except (ValueError, TypeError, KeyError, OSError) as exc:
+                settings_error = str(exc)
+        config, interface, preferred_transport = preferences.output, preferences.interface, preferences.transport
+        self.settings_blocked = settings_error is not None
         self.receiver, self.presets = Receiver(config), Presets()
+        self.receiver.framing = preferences.framing
         self.items, self.busy, self.closing = [], False, False
-        self.crop, self.frame, self.drag_start = Crop(), None, None
+        self.crop, self.frame, self.drag_start = preferences.framing.crop, None, None
         self.loaded_key = None
         body = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         for name in ("top", "bottom", "start", "end"):
@@ -129,7 +142,6 @@ class Window(Gtk.ApplicationWindow):
         body.append(previews)
         controls = Gtk.Box(spacing=8)
         self.aspect = Gtk.DropDown.new_from_strings(["Free crop", "16:9", "4:3", "1:1", "Portrait 9:16"])
-        self.aspect.connect("notify::selected", self.preset_crop)
         self.rotation = Gtk.DropDown.new_from_strings(["0°", "90°", "180°", "270°"])
         self.mirror = Gtk.CheckButton(label="Mirror")
         self.fit = Gtk.DropDown.new_from_strings(["Fit (letterbox)", "Fill (center crop)"])
@@ -148,6 +160,10 @@ class Window(Gtk.ApplicationWindow):
         row.append(self.app_name)
         row.append(self.save)
         body.append(row)
+        self.settings_status = self.label("Settings are saved automatically on this computer.")
+        if settings_error:
+            self.settings_status.set_text("Saved settings could not load; the file was kept: " + settings_error)
+        body.append(self.settings_status)
         row = Gtk.Box(spacing=8)
         self.start = Gtk.Button(label="Start / Reconnect")
         self.start.add_css_class("suggested-action")
@@ -172,8 +188,44 @@ class Window(Gtk.ApplicationWindow):
         self.metric_tick = 0
         self.mode.connect("notify::selected", self.update_mode)
         self.mode.set_selected(("smartview", "airplay", "usb", "wifi").index(preferred_transport))
+        self.rotation.set_selected(preferences.framing.rotation // 90)
+        self.mirror.set_active(preferences.framing.mirror)
+        self.fit.set_selected(int(preferences.framing.fit == "fill"))
+        self.aspect.set_selected(preferences.aspect)
+        self.app_name.set_text(preferences.label)
+        self.aspect.connect("notify::selected", self.preset_crop)
+        for widget, event in ((self.source, "changed"), (self.output, "changed"), (self.interface, "changed"),
+                              (self.app_name, "changed"), (self.size, "notify::selected"), (self.fps, "value-changed"),
+                              (self.mode, "notify::selected"), (self.aspect, "notify::selected"),
+                              (self.rotation, "notify::selected"), (self.mirror, "toggled"), (self.fit, "notify::selected")):
+            widget.connect(event, self.schedule_save)
         self.update_mode()
         self.sensitivity()
+
+    def preferences(self):
+        width, height = self.sizes[self.size.get_selected()]
+        output = OutputConfig(self.source.get_text(), self.output.get_text(), width, height, self.fps.get_value_as_int())
+        return DesktopPreferences(output, self.interface.get_text(), TRANSPORTS[self.mode.get_selected()],
+                                  self.framing(), self.aspect.get_selected(), self.app_name.get_text())
+
+    def schedule_save(self, *_args):
+        if self.save_timer:
+            GLib.source_remove(self.save_timer)
+        self.save_timer = GLib.timeout_add(400, self.save_settings)
+
+    def save_settings(self):
+        if self.save_timer:
+            GLib.source_remove(self.save_timer)
+            self.save_timer = None
+        if self.settings_blocked:
+            self.settings_status.set_text(f"Settings were kept unchanged. Repair {self.settings.path} and reopen Kagami to save changes.")
+            return GLib.SOURCE_REMOVE
+        try:
+            self.settings.save(self.preferences())
+            self.settings_status.set_text("Settings saved on this computer.")
+        except (ValueError, TypeError, KeyError, OSError) as exc:
+            self.settings_status.set_text("Settings were not saved: " + str(exc))
+        return GLib.SOURCE_REMOVE
 
     def update_mode(self, *_args):
         mode = self.mode.get_selected()
@@ -258,7 +310,9 @@ class Window(Gtk.ApplicationWindow):
             config = OutputConfig(self.source.get_text(), self.output.get_text(), width, height, self.fps.get_value_as_int())
             self.receiver.stop()
             self.receiver = Receiver(config)
-            self.crop, self.frame, self.loaded_key = Crop(), None, None
+            self.receiver.framing = self.framing()
+            self.frame, self.loaded_key = None, None
+            self.save_settings()
             if mode == 0:
                 adapter = SmartViewTransport(self.interface.get_text(), allow_disconnect=self.allow_disconnect.get_active())
                 message = "Open Smart View on the Galaxy and select Kagami."
@@ -290,6 +344,7 @@ class Window(Gtk.ApplicationWindow):
         return Framing(self.crop, self.rotation.get_selected() * 90, self.mirror.get_active(), "fill" if self.fit.get_selected() else "fit")
 
     def apply_framing(self):
+        self.schedule_save()
         if self.busy:
             return
         try:
@@ -356,17 +411,19 @@ class Window(Gtk.ApplicationWindow):
         self.receiver.tick()
         if self.receiver.frame and self.loaded_key is None:
             self.frame = self.receiver.frame
+            self.preset_crop()
             self.loaded_key = Presets.key(self.receiver.transport.identity.serial, self.app_name.get_text(), self.frame)
             if self.receiver.transport.identity.connection in ("miracast", "airplay"):
                 self.drawing.queue_draw()
                 return GLib.SOURCE_CONTINUE
             try:
-                preset = self.presets.load(self.receiver.transport.identity.serial, self.app_name.get_text(), self.frame)
-                self.crop = preset.crop
-                self.rotation.set_selected(preset.rotation // 90)
-                self.mirror.set_active(preset.mirror)
-                self.fit.set_selected(int(preset.fit == "fill"))
-                self.receiver.reframe(preset)
+                preset = self.presets.load(self.receiver.transport.identity.serial, self.app_name.get_text(), self.frame, default=None)
+                if preset is not None:
+                    self.crop = preset.crop
+                    self.rotation.set_selected(preset.rotation // 90)
+                    self.mirror.set_active(preset.mirror)
+                    self.fit.set_selected(int(preset.fit == "fill"))
+                    self.receiver.reframe(preset)
             except (ValueError, OSError) as exc:
                 self.status.set_text("Preset could not load: " + str(exc))
         if self.receiver.processor:
@@ -385,6 +442,7 @@ class Window(Gtk.ApplicationWindow):
         return GLib.SOURCE_CONTINUE
 
     def close_window(self, _window):
+        self.save_settings()
         if self.timer:
             GLib.source_remove(self.timer)
             self.timer = None
@@ -405,7 +463,7 @@ class Window(Gtk.ApplicationWindow):
         return GLib.SOURCE_CONTINUE
 
 
-def run(config, interface="wlo1", preferred_transport="smartview"):
+def run(config, interface="wlo1", preferred_transport="smartview", **settings):
     app = Gtk.Application(application_id="io.kagami.Receiver")
-    app.connect("activate", lambda app: Window(app, config, interface, preferred_transport).present() if not app.get_active_window() else app.get_active_window().present())
+    app.connect("activate", lambda app: Window(app, config, interface, preferred_transport, **settings).present() if not app.get_active_window() else app.get_active_window().present())
     return app.run([])

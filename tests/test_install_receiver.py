@@ -92,7 +92,7 @@ kagami_main
                 settings = prepare(config, "wlan2", devices=devices, names=names)
                 self.assertEqual(settings["preferred_transport"], "airplay")
             launcher, _ = write_launchers(base / "app", config, base / "data", home=base)
-            self.assertIn("--preferred-transport airplay", launcher.read_text())
+            self.assertIn("KAGAMI_SETTINGS_FILE", launcher.read_text())
             settings["preferred_transport"] = "usb"
             config.write_text(json.dumps(settings))
             self.assertEqual(prepare(config, devices=devices, names=names)["preferred_transport"], "usb")
@@ -279,6 +279,18 @@ kagami_secure_boot
                              "smartview-doctor", "--interface", "wlan3"])
             self.assertIn("%%value", desktop.read_text())
             self.assertNotIn("sudo", launcher.read_text())
+            # Saved changes must reach the next launch without reinstalling or
+            # regenerating the wrapper, including a rollback to an older app.
+            settings = json.loads(config.read_text())
+            settings.update(width=1920, height=1080, fps=60, preferred_transport="airplay")
+            config.write_text(json.dumps(settings))
+            result = subprocess.run([str(launcher), "desktop"],
+                                    env={**os.environ, "PATH": str(commands) + os.pathsep + os.environ["PATH"]},
+                                    capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.splitlines(), ["/usr/bin/python3", "--source", "/dev/video21", "--output",
+                             "/dev/video20", "--width", "1920", "--height", "1080", "--fps", "60", "--interface", "wlan2",
+                             "--preferred-transport", "airplay", "desktop"])
 
 
 if __name__ == "__main__":

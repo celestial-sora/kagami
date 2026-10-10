@@ -111,24 +111,34 @@ def write_launchers(root, config, data, *, home=None):
     launcher = home / ".local/bin/kagami"
     desktop = data / "applications/io.kagami.Host.desktop"
     command = desktop_quote(launcher)
-    args = ["--source", settings["source"], "--output", settings["output"],
-            "--width", str(settings["width"]), "--height", str(settings["height"]),
-            "--fps", str(settings["fps"]), "--interface", settings["interface"]]
     if "preferred_transport" in settings:
         if settings["preferred_transport"] not in TRANSPORTS:
             raise ValueError("Unknown preferred transport.")
-        args.extend(("--preferred-transport", settings["preferred_transport"]))
+    # Read at every launch, rather than freezing install-time defaults. Use only
+    # existing CLI flags so app-payload rollback still works with older versions.
+    launch_python = '''import json, os, sys
+with open(sys.argv[1], encoding="utf-8") as stream:
+    settings = json.load(stream)
+args = []
+for key, flag in (("source", "--source"), ("output", "--output"), ("width", "--width"),
+                  ("height", "--height"), ("fps", "--fps"), ("interface", "--interface"),
+                  ("preferred_transport", "--preferred-transport")):
+    if key in settings:
+        args.extend((flag, str(settings[key])))
+os.execv("/bin/sh", ["/bin/sh", sys.argv[2], *args, *sys.argv[3:]])
+'''
     launcher.parent.mkdir(parents=True, exist_ok=True)
     desktop.parent.mkdir(parents=True, exist_ok=True)
     launcher.write_text("#!/bin/sh\nset -eu\n"
                         'if [ "$(id -u)" = 0 ]; then echo "Run Kagami as your desktop user." >&2; exit 2; fi\n'
                         "export KAGAMI_PYTHON=/usr/bin/python3\n"
+                        f"export KAGAMI_SETTINGS_FILE={shlex.quote(str(config))}\n"
                         'case "${1:-}" in\n'
                         f"  rollback|versions) exec /usr/bin/python3 {shlex.quote(str(root / 'manage_versions.py'))} "
                         f'--root {shlex.quote(str(root))} "$1" ;;\n'
                         'esac\n'
-                        f"exec /bin/sh {shlex.quote(str(root / 'current/tools/run-receiver.sh'))} "
-                        + shlex.join(args) + ' "$@"\n', encoding="utf-8")
+                        f"exec /usr/bin/python3 -c {shlex.quote(launch_python)} {shlex.quote(str(config))} "
+                        f"{shlex.quote(str(root / 'current/tools/run-receiver.sh'))} " + '"$@"\n', encoding="utf-8")
     launcher.chmod(0o755)
     desktop.write_text("[Desktop Entry]\nType=Application\nName=Kagami\n"
                        "Comment=Phone screen to virtual camera\n"

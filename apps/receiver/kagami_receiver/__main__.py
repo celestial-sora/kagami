@@ -1,7 +1,7 @@
 """Kagami V2: native GTK desktop or headless receiver/diagnostics."""
 
 import argparse
-from dataclasses import asdict
+from dataclasses import asdict, replace
 import getpass
 import json
 import os
@@ -20,11 +20,12 @@ def report(value):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", nargs="?", choices=("desktop", "doctor", "devices", "pair", "connect", "mirror", "smartview", "smartview-doctor", "airplay", "airplay-doctor"), default="desktop")
-    parser.add_argument("--source", default="/dev/video11")
-    parser.add_argument("--output", default="/dev/video10")
-    parser.add_argument("--width", type=int, default=1280)
-    parser.add_argument("--height", type=int, default=720)
-    parser.add_argument("--fps", type=int, default=30)
+    parser.add_argument("--source")
+    parser.add_argument("--output")
+    parser.add_argument("--width", type=int)
+    parser.add_argument("--height", type=int)
+    parser.add_argument("--fps", type=int)
+    parser.add_argument("--settings", help="Desktop settings JSON (default: XDG config directory)")
     parser.add_argument("--serial")
     parser.add_argument("--mode", choices=("usb", "wifi"), default="usb")
     parser.add_argument("--endpoint")
@@ -32,17 +33,30 @@ def main():
     parser.add_argument("--rotation", type=int, choices=(0, 90, 180, 270), default=0)
     parser.add_argument("--mirror", action="store_true")
     parser.add_argument("--fit", choices=("fit", "fill"), default="fit")
-    parser.add_argument("--interface", default="wlo1")
+    parser.add_argument("--interface")
     parser.add_argument("--allow-network-disconnect", action="store_true")
     parser.add_argument("--airplay-port", type=int, default=35000)
-    parser.add_argument("--preferred-transport", choices=("smartview", "airplay", "usb", "wifi"), default="smartview")
+    parser.add_argument("--preferred-transport", choices=("smartview", "airplay", "usb", "wifi"))
     args = parser.parse_args()
     receiver = None
     cleanup_failed = False
     try:
         if os.geteuid() == 0:
             raise ReceiverError("permission", "Run Kagami as your desktop user, never as root.")
-        config = OutputConfig(args.source, args.output, args.width, args.height, args.fps)
+        from .settings import DesktopPreferences, Settings
+        settings = Settings(args.settings)
+        preferences, settings_error = DesktopPreferences(), None
+        if args.action == "desktop":
+            try:
+                preferences = settings.load()
+            except (ValueError, TypeError, KeyError, OSError) as exc:
+                settings_error = str(exc)
+        defaults = preferences.output
+        config = OutputConfig(*(value if value is not None else fallback for value, fallback in
+                               zip((args.source, args.output, args.width, args.height, args.fps),
+                                   (defaults.source, defaults.device, defaults.width, defaults.height, defaults.fps))))
+        args.interface = args.interface if args.interface is not None else preferences.interface
+        args.preferred_transport = args.preferred_transport or preferences.transport
         if args.action == "devices":
             report({"devices": [asdict(item) for item in devices()]})
         elif args.action in ("pair", "connect"):
@@ -75,7 +89,9 @@ def main():
             return 0 if all(c["ok"] for c in checks) else 2
         elif args.action == "desktop":
             from .desktop import run
-            return run(config, args.interface, args.preferred_transport)
+            preferences = replace(preferences, output=config, interface=args.interface, transport=args.preferred_transport)
+            return run(config, args.interface, args.preferred_transport, settings=settings,
+                       preferences=preferences, settings_error=settings_error)
         else:
             from .controller import Receiver
             from .model import Crop

@@ -52,4 +52,6 @@ bash tools/run-receiver.sh smartview-doctor --interface wlo1
 
 See [AirPlay setup](docs/airplay-ubuntu.md), [Smart View setup](docs/smartview-ubuntu.md), [ADB setup](docs/receiver-setup.md), [architecture](docs/architecture.md) and [handoff](docs/handoff.md). Kagami source is MIT; external MiracleCast and UxPlay retain their own licenses and run as separate processes.
 
+The desktop automatically remembers connection mode, loopback paths, output size/FPS, adapter, crop/aspect, rotation, mirror, fit/fill and preset label in `~/.config/kagami/settings.json` (or the XDG config directory). Changes are saved after a short pause and on close; Stop/Start retains framing. The launcher reads the latest settings each time. Pairing codes and adapter-disconnection consent are never remembered, and reopening does not start capture.
+
 The installer checks the active commit first, skips unchanged downloads/builds, and reuses verified MiracleCast/UxPlay builds on app-only updates. It shows numbered progress and preserves previous app versions: `kagami versions`, `kagami rollback`. Use the same curl command with `bash -s -- --repair` to repeat system setup. Release tags are supported through `KAGAMI_REF`; the stable GitHub Release channel is planned. See [installation details](docs/installation.md).

@@ -2,18 +2,24 @@
 """Real GTK window/crop smoke check under Xvfb; never captures a phone."""
 from pathlib import Path
 import sys
+import tempfile
 
 root = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(root / "apps/receiver")]
 from kagami_receiver.desktop import GLib, Gtk, Window
-from kagami_receiver.model import FrameFormat, OutputConfig
+from gi.repository import Gio
+from kagami_receiver.model import Crop, FrameFormat, OutputConfig
+from kagami_receiver.settings import Settings
 
-app = Gtk.Application(application_id="io.kagami.ReceiverSmoke")
+app = Gtk.Application(application_id="io.kagami.ReceiverSmoke", flags=Gio.ApplicationFlags.NON_UNIQUE)
 errors = []
+checks_ran = []
+temporary = tempfile.TemporaryDirectory(prefix="kagami-desktop-qa-")
+settings = Settings(Path(temporary.name) / "settings.json")
 
 
 def activate(application):
-    window = Window(application, OutputConfig(), "wlan2", "airplay")
+    window = Window(application, OutputConfig(), "wlan2", "airplay", settings=settings)
     window.set_default_size(920, 520)
     window.present()
     def check():
@@ -35,11 +41,41 @@ def activate(application):
             from kagami_receiver.controller import Receiver
             from unittest.mock import patch
             window.size.set_selected(window.sizes.index((1920, 1080)))
+            window.fps.set_value(60)
+            window.rotation.set_selected(1)
+            window.mirror.set_active(True)
+            window.fit.set_selected(1)
+            window.crop = Crop(.1, .2, .7, .6)
+            window.apply_framing()
+            framing = window.framing()
             with patch.object(Receiver, "start", lambda _, transport: starts.append(transport)):
                 window.start_receiver(None)
             assert len(starts) == 1 and starts[0].identity.connection == "airplay"
             assert "Screen Mirroring" in window.status.get_text()
             assert (window.receiver.config.width, window.receiver.config.height) == (1920, 1080)
+            assert window.receiver.framing == framing
+            window.stop_receiver(None)
+            with patch.object(Receiver, "start", lambda _, transport: starts.append(transport)):
+                window.start_receiver(None)
+            assert window.receiver.framing == framing
+            restored = Window(application, OutputConfig(), settings=settings)
+            assert restored.receiver.config == window.receiver.config
+            assert restored.framing() == framing
+            assert restored.mode.get_selected() == 1
+            assert restored.fps.get_value_as_int() == 60
+            assert restored.interface.get_text() == "wlan2"
+            assert not restored.allow_disconnect.get_active()
+            assert restored.code.get_text() == ""
+            assert restored.receiver.state == "stopped"
+            restored.close_window(restored)
+            restored.destroy()
+            bad_path = Path(temporary.name) / "invalid.json"
+            bad_path.write_text("{incomplete")
+            invalid = Window(application, OutputConfig(), settings=Settings(bad_path))
+            assert "could not load" in invalid.settings_status.get_text()
+            invalid.close_window(invalid)
+            invalid.destroy()
+            assert bad_path.read_text() == "{incomplete"
             window.mode.set_selected(3)
             assert window.transport_panels[2].get_visible()
             assert window.device.get_visible()
@@ -51,15 +87,38 @@ def activate(application):
             assert window.receiver.state == "stopped"
             assert window.stop.get_sensitive() is False
             window.stop_receiver(None)
+            window.interface.set_text("wlan3")
+            window.app_name.set_text("Remember this label")
+            window.allow_disconnect.set_active(True)
+            window.code.set_text("123456")
         except Exception as exc:
             errors.append(str(exc))
-        GLib.timeout_add(200, lambda: (window.close(), GLib.SOURCE_REMOVE)[1])
+        def check_autosave():
+            checks_ran.append(True)
+            try:
+                saved = settings.load()
+                assert saved.interface == "wlan3"
+                assert saved.transport == "wifi"
+                assert saved.label == "Remember this label"
+                assert "123456" not in settings.path.read_text()
+                restored = Window(application, OutputConfig(), settings=settings)
+                assert restored.mode.get_selected() == 3
+                assert not restored.allow_disconnect.get_active()
+                assert restored.code.get_text() == ""
+                restored.close_window(restored)
+                restored.destroy()
+            except Exception as exc:
+                errors.append("Autosave: " + str(exc))
+            window.close()
+            return GLib.SOURCE_REMOVE
+        GLib.timeout_add(600, check_autosave)
         return GLib.SOURCE_REMOVE
     GLib.timeout_add(300, check)
 
 
 app.connect("activate", activate)
 status = app.run([])
-if status or errors:
+temporary.cleanup()
+if status or errors or not checks_ran:
     raise SystemExit("GTK smoke check failed: " + "; ".join(errors))
-print("GTK4 receiver window, crop controls and stop/close passed (no hardware).")
+print("GTK4 receiver controls, autosave/reopen, retained Start framing and stop/close passed (no hardware).")

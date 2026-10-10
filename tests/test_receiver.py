@@ -55,6 +55,7 @@ class GeometryTests(unittest.TestCase):
             self.assertEqual(store.load("serial", "Samsung Camera", frame), framing)
             self.assertEqual(store.load("serial", "Samsung Camera", FrameFormat(1920, 1080)), Framing())
             self.assertEqual(store.load("other", "Samsung Camera", frame), Framing())
+            self.assertIsNone(store.load("other", "Samsung Camera", frame, default=None))
             self.assertEqual(store.load("serial", "TikTok", frame), Framing())
             self.assertEqual(store.path.stat().st_mode & 0o777, 0o600)
             self.assertNotIn("pixels", store.path.read_text())

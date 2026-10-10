@@ -129,10 +129,10 @@ class Presets:
         # Dimensions identify captured orientation; no frame or app data is stored.
         return json.dumps([serial, app, frame.width, frame.height], ensure_ascii=False)
 
-    def load(self, serial, app, frame):
+    def load(self, serial, app, frame, default=Framing()):
         value = self._read().get(self.key(serial, app, frame))
         return Framing(crop=Crop(**value["crop"]), rotation=value["rotation"],
-                       mirror=value["mirror"], fit=value["fit"]) if value else Framing()
+                       mirror=value["mirror"], fit=value["fit"]) if value else default
 
     def save(self, serial, app, frame, framing):
         data = self._read()
