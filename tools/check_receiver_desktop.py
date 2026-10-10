@@ -14,11 +14,18 @@ errors = []
 
 def activate(application):
     window = Window(application, OutputConfig(), "wlan2", "airplay")
+    window.set_default_size(920, 520)
     window.present()
     def check():
         try:
             assert window.interface.get_text() == "wlan2"
             assert window.mode.get_selected() == 1
+            assert window.start.get_label() == "Start AirPlay"
+            assert window.start.get_parent().get_parent() == window.get_child()
+            assert window.status.get_parent() == window.get_child()
+            visible, bounds = window.start.compute_bounds(window)
+            assert visible and bounds.get_y() >= 0
+            assert bounds.get_y() + bounds.get_height() <= window.get_height()
             assert window.transport_panels[1].get_visible()
             assert not window.transport_panels[0].get_visible()
             assert not window.device.get_visible()

@@ -28,10 +28,16 @@ class Window(Gtk.ApplicationWindow):
             getattr(body, "set_margin_" + name)(20)
         scroll = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER)
         scroll.set_child(body)
-        self.set_child(scroll)
+        scroll.set_vexpand(True)
+        shell = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        shell.append(scroll)
+        self.set_child(shell)
         heading = Gtk.Label(label="Kagami · Phone screen → Virtual Camera", xalign=0)
         heading.add_css_class("title-1")
-        body.append(heading)
+        heading.set_margin_top(16)
+        heading.set_margin_start(20)
+        heading.set_margin_end(20)
+        shell.prepend(heading)
         body.append(self.label("Open Samsung Camera, TikTok, or your preferred app on the phone. Drag over its preview to crop."))
         modes = Gtk.Box(spacing=10)
         self.mode = Gtk.DropDown.new_from_strings(["Samsung Smart View (experimental)", "AirPlay · iPhone / iPad / Mac (experimental)", "USB Mirror (fallback)", "Wi-Fi ADB Mirror"])
@@ -147,10 +153,14 @@ class Window(Gtk.ApplicationWindow):
         self.stop.connect("clicked", self.stop_receiver)
         row.append(self.start)
         row.append(self.stop)
-        body.append(row)
+        row.set_margin_start(20)
+        row.set_margin_end(20)
+        shell.insert_child_after(row, heading)
         self.status = self.label("Stopped. Select two Kagami loopbacks; see docs/receiver-setup.md.")
         self.metrics = self.label("OBS / Discord consumer verification: pending manual check.")
-        body.append(self.status)
+        self.status.set_margin_start(20)
+        self.status.set_margin_end(20)
+        shell.insert_child_after(self.status, row)
         body.append(self.metrics)
         self.connect("close-request", self.close_window)
         self.timer = GLib.timeout_add(100, self.tick)
@@ -164,12 +174,16 @@ class Window(Gtk.ApplicationWindow):
 
     def update_mode(self, *_args):
         mode = self.mode.get_selected()
+        self.start.set_label(("Start Smart View", "Start AirPlay", "Start USB mirror", "Start Wi-Fi mirror")[mode])
         smart, air, wireless = self.transport_panels
         smart.set_visible(mode == 0)
         air.set_visible(mode == 1)
         wireless.set_visible(mode == 3)
         for widget in (self.device, self.refresh, self.adb_info):
             widget.set_visible(mode >= 2)
+        if self.receiver.state == "stopped" and not self.busy:
+            self.status.set_text("AirPlay is stopped. Click Start AirPlay, then select Kagami in Screen Mirroring on the same network."
+                                 if mode == 1 else "Receiver is stopped. Check the selected connection, then click Start.")
 
     @staticmethod
     def label(text):

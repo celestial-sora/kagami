@@ -4,7 +4,7 @@ Kagami's experimental AirPlay adapter uses [UxPlay](https://github.com/FDH2/UxPl
 
 ## Use
 
-Run the [one-command installer](installation.md), then open Kagami. Choose **AirPlay**, click **Check AirPlay**, then **Start**. On iPhone/iPad/Mac open **Screen Mirroring → Kagami** while connected to the same local network. Apply a crop and select **Kagami Virtual Camera** in OBS. Click Stop in Kagami to stop its receiver and decoding.
+Run the [one-command installer](installation.md), then open Kagami. Choose **AirPlay**, click **Check AirPlay**, then **Start AirPlay** in the fixed top controls. On iPhone/iPad/Mac open **Screen Mirroring → Kagami** while connected to the same local network. Apply a crop and select **Kagami Virtual Camera** in OBS. Click Stop in Kagami to stop its receiver and decoding. Merely opening the app does not advertise Kagami: it appears in Screen Mirroring only while the receiver is started. The Start/Stop buttons and status remain visible above the scrollable preview/settings, including on smaller windows.
 
 AirPlay needs ordinary LAN access and Avahi/mDNS discovery; it does not require P2P-client/P2P-GO or disconnect the Wi-Fi adapter. Native Galaxy Smart View is a Miracast sender. A Samsung device would require a separate AirPlay sender implementation; no Android sender app has been selected or validated here.
 
