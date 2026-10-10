@@ -13,12 +13,12 @@ errors = []
 
 
 def activate(application):
-    window = Window(application, OutputConfig(), "wlan2")
+    window = Window(application, OutputConfig(), "wlan2", "airplay")
     window.present()
     def check():
         try:
             assert window.interface.get_text() == "wlan2"
-            window.mode.set_selected(1)
+            assert window.mode.get_selected() == 1
             assert window.transport_panels[1].get_visible()
             assert not window.transport_panels[0].get_visible()
             assert not window.device.get_visible()

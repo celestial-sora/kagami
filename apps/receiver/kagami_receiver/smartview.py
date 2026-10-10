@@ -32,9 +32,8 @@ def interface_modes(text):
     return set(re.findall(r"\*\s+(\S+)", match[1])) if match else set()
 
 
-def preflight(interface):
+def p2p_check(interface):
     interface = interface_name(interface)
-    checks = []
     try:
         info = command(["iw", "dev", interface, "info"])
         match = re.search(r"\bwiphy\s+(\d+)", info)
@@ -42,11 +41,15 @@ def preflight(interface):
             raise ValueError("Selected interface is not a wireless PHY.")
         modes = interface_modes(command(["iw", "phy", "phy" + match[1], "info"]))
         compatible = {"P2P-client", "P2P-GO"}.issubset(modes)
-        checks.append({"name": "wifi_direct", "ok": compatible,
+        return {"name": "wifi_direct", "ok": compatible,
                        "detail": "P2P client/GO advertised; Galaxy interoperability is unverified." if compatible else
-                       "This Wi-Fi driver does not advertise P2P-client/P2P-GO. Smart View needs a compatible adapter/driver."})
+                       "This Wi-Fi driver does not advertise P2P-client/P2P-GO. Smart View needs a compatible adapter/driver."}
     except (OSError, ValueError, RuntimeError) as exc:
-        checks.append({"name": "wifi_direct", "ok": False, "detail": str(exc)})
+        return {"name": "wifi_direct", "ok": False, "detail": str(exc)}
+
+
+def preflight(interface):
+    checks = [p2p_check(interface)]
     for binary in ("miracle-wifid", "miracle-sinkctl", "pkexec", "nmcli"):
         checks.append({"name": binary, "ok": bool(shutil.which(binary)), "detail": shutil.which(binary) or "Not installed"})
     installed = HELPER.is_file() and HELPER.stat().st_uid == 0 and not HELPER.stat().st_mode & 0o022

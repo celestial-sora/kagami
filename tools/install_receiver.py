@@ -10,7 +10,22 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / "apps/receiver")]
 from kagami_receiver.model import OutputConfig
-from kagami_receiver.smartview import interface_modes, interface_name
+from kagami_receiver.smartview import interface_modes, interface_name, p2p_check
+
+TRANSPORTS = ("smartview", "airplay", "usb", "wifi")
+
+
+def installation_report(smartview_checks, airplay_checks, common_checks):
+    """Smart View availability does not gate the AirPlay installation."""
+    checks = [{**check, "transport": transport, "required": required}
+              for transport, required, values in (("smartview", False, smartview_checks),
+                                                   ("airplay", True, airplay_checks),
+                                                   ("common", True, common_checks))
+              for check in values]
+    available = {"smartview": all(c["ok"] for c in smartview_checks),
+                 "airplay": all(c["ok"] for c in airplay_checks)}
+    return {"checks": checks, "available_transports": available}, 2 if any(
+        not c["ok"] and c["required"] for c in checks) else 0
 
 
 def desktop_quote(value):
@@ -75,6 +90,10 @@ def prepare(path, selected_interface=None, **camera_paths):
                     "width": 1280, "height": 720, "fps": 30, "interface": interface}
     elif selected_interface:
         settings["interface"] = interface
+    if "preferred_transport" not in settings or selected_interface:
+        settings["preferred_transport"] = "smartview" if p2p_check(interface)["ok"] else "airplay"
+    if settings["preferred_transport"] not in TRANSPORTS:
+        raise ValueError("Unknown preferred transport.")
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(".next")
     temporary.write_text(json.dumps(settings, indent=2) + "\n", encoding="utf-8")
@@ -95,6 +114,10 @@ def write_launchers(root, config, data, *, home=None):
     args = ["--source", settings["source"], "--output", settings["output"],
             "--width", str(settings["width"]), "--height", str(settings["height"]),
             "--fps", str(settings["fps"]), "--interface", settings["interface"]]
+    if "preferred_transport" in settings:
+        if settings["preferred_transport"] not in TRANSPORTS:
+            raise ValueError("Unknown preferred transport.")
+        args.extend(("--preferred-transport", settings["preferred_transport"]))
     launcher.parent.mkdir(parents=True, exist_ok=True)
     desktop.parent.mkdir(parents=True, exist_ok=True)
     launcher.write_text("#!/bin/sh\nset -eu\n"
@@ -136,9 +159,9 @@ if __name__ == "__main__":
         from kagami_receiver.smartview import preflight
         from kagami_receiver.airplay import preflight as airplay_preflight
         settings = json.loads(args.config.read_text())
-        checks = preflight(settings["interface"])
-        checks.extend(airplay_preflight())
-        checks.append({"name": "gtk4", "ok": (Gtk.get_major_version(), Gtk.get_minor_version()) >= (4, 8), "detail": "GTK4 + Cairo"})
-        print(json.dumps({"checks": checks, "samsung_interoperability": "physical Galaxy test pending"}))
-        sys.exit(2 if any(not c["ok"] for c in checks if c["name"] != "wifi_direct") else
-                 10 if any(not c["ok"] for c in checks) else 0)
+        report, status = installation_report(preflight(settings["interface"]), airplay_preflight(),
+            [{"name": "gtk4", "ok": (Gtk.get_major_version(), Gtk.get_minor_version()) >= (4, 8), "detail": "GTK4 + Cairo"}])
+        print(json.dumps(report))
+        if not report["available_transports"]["smartview"]:
+            print("Smart View unavailable on this adapter/setup; it does not block AirPlay installation.")
+        sys.exit(status)

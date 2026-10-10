@@ -6,10 +6,11 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
-from install_receiver import camera_numbers, prepare, write_launchers
+from install_receiver import camera_numbers, prepare, write_launchers, installation_report
 from manage_versions import activate, rollback, versions
 
 
@@ -20,7 +21,7 @@ def shell(script, **env):
 
 class ReceiverInstallerTests(unittest.TestCase):
     def test_full_installer_activation_and_pending_states_with_fake_system(self):
-        for mode, expected in (("ready", 0), ("no-p2p", 10), ("mok-pending", 10), ("software-failed", 2)):
+        for mode, expected in (("ready", 0), ("no-p2p", 0), ("mok-pending", 10), ("software-failed", 2)):
             with self.subTest(mode=mode), tempfile.TemporaryDirectory() as temporary:
                 base = Path(temporary)
                 root = base / "data/kagami"
@@ -48,7 +49,7 @@ python3() {
     elif [[ $2 == prepare ]]; then
         printf '{"output":"/dev/video10","source":"/dev/video11","interface":"wlan2"}\\n';
     elif [[ $2 == check ]]; then
-        case $KAGAMI_TEST_MODE in no-p2p) return 10 ;; software-failed) return 2 ;; esac;
+        case $KAGAMI_TEST_MODE in no-p2p) printf "Smart View unavailable; AirPlay ready\\n" ;; software-failed) return 2 ;; esac;
     elif [[ $2 == launchers ]]; then touch "$KAGAMI_TEST_BASE/launcher";
     else return 99; fi
 }
@@ -65,6 +66,38 @@ kagami_main
                 self.assertEqual("restart kagami-receiver-camera.service" in calls, mode != "mok-pending")
                 self.assertNotIn("NetworkManager", calls)
                 self.assertFalse(list(base.glob("kagami-install.*")))
+
+    def test_missing_p2p_only_disables_smartview_not_airplay_installation(self):
+        smart = [{"name": "wifi_direct", "ok": False, "detail": "No P2P driver"},
+                 {"name": "network_helper", "ok": False, "detail": "Not installed"}]
+        air = [{"name": "airplay_backend", "ok": True, "detail": "UxPlay ready"}]
+        common = [{"name": "gtk4", "ok": True, "detail": "GTK4 ready"}]
+        report, status = installation_report(smart, air, common)
+        self.assertEqual(status, 0)
+        self.assertEqual(report["available_transports"], {"smartview": False, "airplay": True})
+        self.assertFalse(any(c["required"] for c in report["checks"] if c["transport"] == "smartview"))
+        for failed in (air[0], common[0]):
+            with self.subTest(check=failed["name"]):
+                failed["ok"] = False
+                self.assertEqual(installation_report(smart, air, common)[1], 2)
+                failed["ok"] = True
+
+    def test_installer_defaults_to_airplay_without_p2p_and_preserves_choice(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            devices, names = base / "dev", base / "sys"
+            devices.mkdir(); names.mkdir()
+            config = base / "settings.json"
+            with patch("install_receiver.p2p_check", return_value={"ok": False}):
+                settings = prepare(config, "wlan2", devices=devices, names=names)
+                self.assertEqual(settings["preferred_transport"], "airplay")
+            launcher, _ = write_launchers(base / "app", config, base / "data", home=base)
+            self.assertIn("--preferred-transport airplay", launcher.read_text())
+            settings["preferred_transport"] = "usb"
+            config.write_text(json.dumps(settings))
+            self.assertEqual(prepare(config, devices=devices, names=names)["preferred_transport"], "usb")
+            with patch("install_receiver.p2p_check", return_value={"ok": True}):
+                self.assertEqual(prepare(config, "wlan3", devices=devices, names=names)["preferred_transport"], "smartview")
 
     def test_same_commit_skips_download_packages_and_backends(self):
         with tempfile.TemporaryDirectory() as temporary:

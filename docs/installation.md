@@ -6,7 +6,7 @@ Run in a terminal as your ordinary desktop user on Ubuntu 24.04 or 26.04:
 curl -fsSL https://raw.githubusercontent.com/celestial-sora/kagami/main/install.sh | bash
 ```
 
-This installs **Kagami V2**, replacing the normal Kagami application-menu/CLI entry point with the native screen receiver. Samsung Smart View is the default, experimental transport. Previous V1 app versions, HTTPS config/CA and receiver presets are preserved. The browser URL/QR client, HTTPS/WebRTC pairing service and V1 shell/installer have been removed. Connections use the sender’s Smart View or Screen Mirroring discovery list.
+This installs **Kagami V2**, replacing the normal Kagami application-menu/CLI entry point with the native screen receiver. Samsung Smart View is the default when the selected driver advertises P2P. Otherwise a new installation defaults to AirPlay. Previous V1 app versions, HTTPS config/CA and receiver presets are preserved. The browser URL/QR client, HTTPS/WebRTC pairing service and V1 shell/installer have been removed. Connections use the sender’s Smart View or Screen Mirroring discovery list.
 
 The command requests your sudo password, installs GTK4/Python/GStreamer, Avahi discovery, Wi-Fi Direct tools, matching running-kernel headers and the DKMS virtual camera driver. It downloads Kagami and builds [MiracleCast](https://github.com/albfan/miraclecast) at pinned commit `0b7f1f1f6586dc65ff480f3cda5c2170a70aa020` as your ordinary user. It also builds UxPlay v1.73.2 at `4764e4619e8924f43601d778277fc9f0bf280597`, installing `/usr/local/bin/kagami-uxplay` plus license/version files. Only fixed binaries, D-Bus policy, network helpers and camera service are installed as root. MiracleCast's license is installed with its version record. No Rust build or phone app is required for Smart View.
 
@@ -26,7 +26,7 @@ Choose **AirPlay**, click **Check AirPlay**, then **Start**. On an iPhone/iPad/M
 
 **Real Galaxy discovery, P2P negotiation, network restoration and OBS streaming remain unverified.** Software tests and a successful installation do not prove phone interoperability. See [current Smart View blockers](smartview-ubuntu.md) and [validation](validation.md).
 
-The authoring host's `rtw88_8821ce` driver advertises no P2P-client/P2P-GO. The software can be installed, but that adapter cannot pass Kagami's Smart View preflight. A compatible adapter/driver is required; a separate adapter also allows the primary adapter to keep providing Internet. Do not choose a dongle only by a Wi-Fi generation/marketing label: verify its actual chipset, hardware revision and Linux P2P modes.
+The authoring host's `rtw88_8821ce` driver advertises no P2P-client/P2P-GO. Installation succeeds with AirPlay; that adapter cannot pass Kagami's Smart View preflight. A compatible adapter/driver is required; a separate adapter also allows the primary adapter to keep providing Internet. Do not choose a dongle only by a Wi-Fi generation/marketing label: verify its actual chipset, hardware revision and Linux P2P modes.
 
 USB/ADB fallback remains available in the app but requires a separate authorized ADB/scrcpy 3.0+ installation. It is not needed by this Smart View installer.
 
@@ -36,7 +36,7 @@ Matching headers for the running kernel are required. DKMS builds the driver and
 
 With Secure Boot enabled, Ubuntu/DKMS signing may require a MOK enrollment password. The installer requests enrollment using the terminal if the signing certificate is not already enrolled. Reboot and choose **Enroll MOK**, confirming with the password you set. The enabled camera service will create the named nodes after reboot; no additional manual helper commands are needed. Secure Boot is never disabled.
 
-Exit status **0** after a full installation means software/camera prerequisite checks passed (an unchanged-commit shortcut only confirms the active app version); it does not mean a Galaxy was tested. **10** means the application was installed but MOK enrollment/reboot or P2P hardware is pending. **2** means setup or required software checks failed. Package/build commands can also propagate their own failure status. Read the preceding report for the specific missing prerequisite.
+Exit status **0** after a full installation means software/camera prerequisite checks passed (an unchanged-commit shortcut only confirms the active app version); it does not mean a Galaxy was tested. **10** means the application was installed but camera MOK enrollment/reboot is pending. Missing P2P is a Smart View availability warning and does not change a successful AirPlay installation to a nonzero exit. **2** means setup or required software checks failed. Package/build commands can also propagate their own failure status. Read the preceding report for the specific missing prerequisite.
 
 ## Updates and paths
 
@@ -94,3 +94,5 @@ Repair repeats setup even at the same app commit; matching usable backend builds
 ## Stable releases
 
 The development default remains `main`. `KAGAMI_REF` already accepts release tags and full commit IDs; annotated tags are resolved to their commit before comparison/download. Once tested GitHub Releases are published, the default channel can move to a release-pinned installer with checksummed artifacts. No stable release or prebuilt artifact is claimed by the current installer. Use an actually published tag on the bash side, for example `KAGAMI_REF=<published-tag> bash`, instead of inventing a version name.
+
+UxPlay v1.73.2 is built with a narrow compatibility fix adding its missing `<stdio.h>` declaration for GCC 14/15. Kagami retains the pinned upstream commit and normal compiler error checks. This fixes the actual Ubuntu 26.04/GCC 15 build failure; no compiler errors are suppressed.

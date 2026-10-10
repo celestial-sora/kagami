@@ -4,7 +4,7 @@ Installer update checks additionally exercise unchanged-commit skips without dow
 
 This batch adds experimental UxPlay AirPlay reception and removes the browser client, HTTPS/WebRTC pairing host, QR-generating Rust shell, V1 installer/TLS helpers and obsolete dependencies/tests. Reusable V4L2 guards now live inside the receiver. Historical evidence below describes removed code and is not current compatibility evidence.
 
-- **46 current contracts/media tests**: default headless run passes 40 and skips six opt-in media tests. Real synthetic AirPlay H264/RTP portrait input passes, proving changing decoded frames, fixed 1280×720 canvas and black side borders. Receiver transform and Smart View RTP tests remain covered.
+- **52 current contracts/media tests**: default headless run passes 46 and skips six opt-in media tests. Real synthetic AirPlay H264/RTP portrait input passes, proving changing decoded frames, fixed 1280×720 canvas and black side borders. Receiver transform and Smart View RTP tests remain covered.
 - AirPlay contracts verify UxPlay version/options, Avahi checks without P2P/network mutations, failure cleanup, stale stream, loopback-only forwarding, ignored personal config, audio/recording disabled, real child teardown and first-frame waiting.
 - GTK/Xvfb checks mode visibility, AirPlay start without ADB selection, installer-selected adapter, crop and Stop/close. ShellCheck and compilation cover current code.
 - CI builds pinned UxPlay/MiracleCast on Ubuntu 24.04 and verifies actual AirPlay mDNS advertisement/owned-process teardown. Consult the associated successful run before treating that configuration as evidence.

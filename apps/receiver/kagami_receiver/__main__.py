@@ -35,6 +35,7 @@ def main():
     parser.add_argument("--interface", default="wlo1")
     parser.add_argument("--allow-network-disconnect", action="store_true")
     parser.add_argument("--airplay-port", type=int, default=35000)
+    parser.add_argument("--preferred-transport", choices=("smartview", "airplay", "usb", "wifi"), default="smartview")
     args = parser.parse_args()
     receiver = None
     cleanup_failed = False
@@ -74,7 +75,7 @@ def main():
             return 0 if all(c["ok"] for c in checks) else 2
         elif args.action == "desktop":
             from .desktop import run
-            return run(config, args.interface)
+            return run(config, args.interface, args.preferred_transport)
         else:
             from .controller import Receiver
             from .model import Crop

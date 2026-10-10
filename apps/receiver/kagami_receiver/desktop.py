@@ -17,7 +17,7 @@ from .airplay import AirPlayTransport, preflight as airplay_preflight
 
 
 class Window(Gtk.ApplicationWindow):
-    def __init__(self, app, config, interface="wlo1"):
+    def __init__(self, app, config, interface="wlo1", preferred_transport="smartview"):
         super().__init__(application=app, title="Kagami · 鏡", default_width=1040, default_height=800)
         self.receiver, self.presets = Receiver(config), Presets()
         self.items, self.busy, self.closing = [], False, False
@@ -158,6 +158,7 @@ class Window(Gtk.ApplicationWindow):
                                for value in (signal.SIGTERM, signal.SIGINT)]
         self.metric_tick = 0
         self.mode.connect("notify::selected", self.update_mode)
+        self.mode.set_selected(("smartview", "airplay", "usb", "wifi").index(preferred_transport))
         self.update_mode()
         self.sensitivity()
 
@@ -387,7 +388,7 @@ class Window(Gtk.ApplicationWindow):
         return GLib.SOURCE_CONTINUE
 
 
-def run(config, interface="wlo1"):
+def run(config, interface="wlo1", preferred_transport="smartview"):
     app = Gtk.Application(application_id="io.kagami.Receiver")
-    app.connect("activate", lambda app: Window(app, config, interface).present() if not app.get_active_window() else app.get_active_window().present())
+    app.connect("activate", lambda app: Window(app, config, interface, preferred_transport).present() if not app.get_active_window() else app.get_active_window().present())
     return app.run([])

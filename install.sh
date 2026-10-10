@@ -289,10 +289,10 @@ PY
     printf 'Samsung Smart View is experimental; real Galaxy/OBS verification remains pending.\n'
     printf 'AirPlay is experimental; select AirPlay, then Screen Mirroring → Kagami on iPhone/iPad/Mac. No URL/QR connection is used.\n'
     if (( pending )); then
-        printf 'Installation complete; prerequisites pending (exit 10). Complete MOK enrollment/reboot if requested, or use a P2P-capable Wi-Fi adapter.\n'
+        printf 'Installation complete; camera prerequisites pending (exit 10). Complete MOK enrollment/reboot if requested. P2P is needed only for Smart View; AirPlay does not require it.\n'
         return 10
     fi
-    kagami_log 'Software/camera checks passed. In Kagami confirm the selected adapter may disconnect, then Start; on Galaxy select Smart View → Kagami.'
+    kagami_log 'Software/camera checks passed. Start AirPlay, then choose Screen Mirroring → Kagami on the same LAN. Smart View additionally requires P2P and selected-adapter disconnection consent.'
 }
 # A pipe runs main; sourcing this script for tests only defines functions.
 if [[ -z ${BASH_SOURCE[0]:-} || ${BASH_SOURCE[0]} == "$0" ]]; then kagami_main "$@"; fi
