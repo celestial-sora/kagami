@@ -3,7 +3,7 @@
 Run in a terminal as your ordinary desktop user on Ubuntu 24.04 or 26.04:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/celestial-sora/kagami/main/install.sh | bash
+curl -fsSL https://github.com/celestial-sora/kagami/releases/latest/download/install-kagami.sh | bash
 ```
 
 This installs **Kagami V2**, replacing the normal Kagami application-menu/CLI entry point with the native screen receiver. Samsung Smart View is the default when the selected driver advertises P2P. Otherwise a new installation defaults to AirPlay. Previous V1 app versions, HTTPS config/CA and receiver presets are preserved. The browser URL/QR client, HTTPS/WebRTC pairing service and V1 shell/installer have been removed. Connections use the sender’s Smart View or Screen Mirroring discovery list.
@@ -14,7 +14,7 @@ Internet is needed for installation/updates. Installation leaves Wi-Fi connected
 
 ## AirPlay
 
-Choose **AirPlay**, click **Check AirPlay**, then **Start**. On an iPhone/iPad/Mac on the same local network, choose **Screen Mirroring → Kagami**. Crop the preview and select Kagami Virtual Camera in OBS. It needs Avahi/mDNS, not Wi-Fi Direct. The installer enables Avahi; user-defined firewalls may need LAN-scoped UDP 5353 and TCP/UDP 35000–35002. See [AirPlay setup](airplay-ubuntu.md). Native Galaxy Smart View remains the separate Miracast mode; no Android AirPlay sender has been validated. Physical Apple interoperability is pending.
+Choose **AirPlay**, click **Check AirPlay**, then **Start**. On an iPhone/iPad/Mac on the same local network, choose **Screen Mirroring → Kagami**. Crop the preview and select Kagami Virtual Camera in OBS. It needs Avahi/mDNS, not Wi-Fi Direct. The installer enables Avahi; user-defined firewalls may need LAN-scoped UDP 5353 and TCP/UDP 35000–35002. See [AirPlay setup](airplay-ubuntu.md). Native Galaxy Smart View remains the separate Miracast mode; no Android AirPlay sender has been validated. The maintainer confirmed real iPad video in Kagami and OBS on Ubuntu 26.04; other Apple devices and further session/audio acceptance remain pending.
 
 ## After installation
 
@@ -62,13 +62,13 @@ Run the same curl command to update. The application is versioned by Git SHA/arc
 Inspect the plan without changes:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/celestial-sora/kagami/main/install.sh | bash -s -- --dry-run
+curl -fsSL https://github.com/celestial-sora/kagami/releases/latest/download/install-kagami.sh | bash -s -- --dry-run
 ```
 
 Select an adapter explicitly during install (replace `wlan2` with an existing interface):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/celestial-sora/kagami/main/install.sh | KAGAMI_INTERFACE=wlan2 bash
+curl -fsSL https://github.com/celestial-sora/kagami/releases/latest/download/install-kagami.sh | KAGAMI_INTERFACE=wlan2 bash
 ```
 
 `KAGAMI_REF` on the `bash` side selects a branch, tag or commit. See [source setup](smartview-ubuntu.md) for manual/developer steps.
@@ -87,13 +87,15 @@ Rollback swaps current/previous, so running it again restores the newer app. It 
 The curl installer also accepts `--list-versions` and `--rollback` without app/backend downloads or root installation. To repeat prerequisite checks after a kernel update, MOK enrollment or damaged system installation, use:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/celestial-sora/kagami/main/install.sh | bash -s -- --repair
+curl -fsSL https://github.com/celestial-sora/kagami/releases/latest/download/install-kagami.sh | bash -s -- --repair
 ```
 
 Repair repeats setup even at the same app commit; matching usable backend builds are still reused.
 
 ## Stable releases
 
-The development default remains `main`. `KAGAMI_REF` already accepts release tags and full commit IDs; annotated tags are resolved to their commit before comparison/download. Once tested GitHub Releases are published, the default channel can move to a release-pinned installer with checksummed artifacts. No stable release or prebuilt artifact is claimed by the current installer. Use an actually published tag on the bash side, for example `KAGAMI_REF=<published-tag> bash`, instead of inventing a version name.
+The public install/update command downloads the latest stable release's **install-kagami.sh**, which selects that release tag by default. Release assets include a source archive, exact commit record, release notes and SHA256 checksums. Backends are built locally; no prebuilt receiver binary is claimed. [v2.0.0 release notes](releases/v2.0.0.md) describe validation and remaining device limits.
+
+To pin v2.0.0, replace `releases/latest/download` in the command with `releases/download/v2.0.0`. `KAGAMI_REF` on the bash side explicitly selects another branch, tag or commit; annotated tags resolve to the commit before comparison/download. For development, the repository's `main/install.sh` retains `main` as its default.
 
 UxPlay v1.73.2 is built with a narrow compatibility fix adding its missing `<stdio.h>` declaration for GCC 14/15. Kagami retains the pinned upstream commit and normal compiler error checks. This fixes the actual Ubuntu 26.04/GCC 15 build failure; no compiler errors are suppressed.

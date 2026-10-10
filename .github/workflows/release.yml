@@ -1,0 +1,58 @@
+name: Stable release
+on:
+  push:
+    branches: ['release/**']
+permissions:
+  contents: read
+concurrency:
+  group: stable-release
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Require stable version, main commit and successful CI
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(cat VERSION)
+          [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          [[ $GITHUB_REF_NAME == "release/v$version" ]]
+          [[ $(gh api "repos/$GH_REPO/git/ref/heads/main" --jq .object.sha) == "$GITHUB_SHA" ]]
+          gh api "repos/$GH_REPO/actions/runs?head_sha=$GITHUB_SHA&event=push&per_page=30" |
+            jq -e --arg sha "$GITHUB_SHA" '.workflow_runs | any(.path == ".github/workflows/ci.yml" and .head_sha == $sha and .status == "completed" and .conclusion == "success")'
+          test -f "docs/releases/v$version.md"
+          if gh release view "v$version" > /dev/null 2>&1; then
+            printf 'Release already exists; preserve its tag and assets.\n' >&2
+            exit 2
+          fi
+      - name: Build and check release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          shellcheck tools/build-release.sh
+          bash tools/build-release.sh "$RUNNER_TEMP/kagami-release"
+          shellcheck "$RUNNER_TEMP/kagami-release/install-kagami.sh"
+          bash "$RUNNER_TEMP/kagami-release/install-kagami.sh" --dry-run
+      - name: Create draft, verify uploaded bytes, then publish stable
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="v$(cat VERSION)"
+          gh release create "$tag" "$RUNNER_TEMP/kagami-release/"* \
+            --target "$GITHUB_SHA" --title "Kagami $tag · Stable" \
+            --notes-file "docs/releases/$tag.md" --draft
+          gh release download "$tag" --dir "$RUNNER_TEMP/kagami-release-download"
+          cd "$RUNNER_TEMP/kagami-release-download"
+          sha256sum --check SHA256SUMS
+          [[ $(cat COMMIT) == "$GITHUB_SHA" ]]
+          gh release edit "$tag" --draft=false --latest
+          gh release view "$tag" --json url,isDraft,isPrerelease,tagName

@@ -19,10 +19,10 @@ Kagami receives a phone's **mirrored screen**, lets you crop and adjust the pict
 Open a terminal on **Ubuntu 24.04 or 26.04** and run this as your normal desktop user:
 
 ~~~bash
-curl -fsSL https://raw.githubusercontent.com/celestial-sora/kagami/main/install.sh | bash
+curl -fsSL https://github.com/celestial-sora/kagami/releases/latest/download/install-kagami.sh | bash
 ~~~
 
-The installer sets up the desktop app, receiver dependencies, and virtual camera. It may request your **sudo password**. If Secure Boot is enabled, camera-driver enrollment may also require a reboot. [Read the installation guide](docs/installation.md) or [inspect the script](install.sh) before running it.
+The latest stable installer selects its published release tag by default. The installer sets up the desktop app, receiver dependencies, and virtual camera. It may request your **sudo password**. If Secure Boot is enabled, camera-driver enrollment may also require a reboot. [Read the installation guide](docs/installation.md) or [inspect the script](install.sh) before running it.
 
 **Choose a language below. Each guide expands when clicked.**  
 **เลือกภาษาด้านล่าง แล้วกดเพื่อเปิดหรือปิดคู่มือได้เลย**
@@ -81,7 +81,7 @@ To inspect installed versions or switch back to the previous app version:
 To repeat system setup after a kernel change, module problem, or Secure Boot enrollment:
 
 ~~~bash
-curl -fsSL https://raw.githubusercontent.com/celestial-sora/kagami/main/install.sh | bash -s -- --repair
+curl -fsSL https://github.com/celestial-sora/kagami/releases/latest/download/install-kagami.sh | bash -s -- --repair
 ~~~
 
 For Secure Boot, follow the prompted **Enroll MOK** steps after reboot. App rollback does not roll back shared system packages, drivers, or backend dependencies.
@@ -146,7 +146,7 @@ Detailed guides: [Installation](docs/installation.md) · [AirPlay](docs/airplay-
 หากเปลี่ยน Kernel, มีปัญหาไดรเวอร์ หรือเพิ่งจัดการ Secure Boot ให้รันคำสั่งซ่อม:
 
 ~~~bash
-curl -fsSL https://raw.githubusercontent.com/celestial-sora/kagami/main/install.sh | bash -s -- --repair
+curl -fsSL https://github.com/celestial-sora/kagami/releases/latest/download/install-kagami.sh | bash -s -- --repair
 ~~~
 
 ถ้า Secure Boot ขอให้ลงทะเบียนคีย์ ให้รีบูตแล้วทำขั้นตอน **Enroll MOK** ตามคำแนะนำ การ Rollback จะย้อนเฉพาะตัวแอป ไม่ได้ย้อนแพ็กเกจ ไดรเวอร์ หรือ Backend ที่ติดตั้งร่วมกัน
