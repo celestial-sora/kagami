@@ -1,3 +1,10 @@
+# 1080p camera output and held consumer · 2026-10-10
+
+- With OBS holding video10, the actual GStreamer sink exposed only 1280×720. Requesting 1920×1080 failed negotiation. After the maintainer released the camera, a real named-loopback consumer read five complete 1920×1080 YUY2 frames (4,147,200 bytes each), and the maintainer explicitly confirms **1080p works**.
+- The writer now opens the guarded output and queries supported dimensions before sending buffers or starting AirPlay. A blocked size reports how to deactivate the consumer and retry; controller cleanup releases ownership and leaves Start usable. Desktop controls explain the required order.
+- All **62** contracts/media tests pass with fatal criticals, including complete synthetic 1080p frames, supported/pinned caps and partial-start cleanup. GTK/Xvfb verifies the 1080p selection reaches the receiver. ShellCheck, compilation and diff checks pass.
+- A separate actual video10 check reads a full 1080p frame, keeps its consumer open while stopping the writer, rejects a 720p restart before any frame is emitted, then successfully restarts the writer at the held 1080p size. No screen/media files are recorded. AirPlay input remains 1280×720; this proves output dimensions, not native 1080p AirPlay input.
+
 # AirPlay static-screen lifecycle correction · 2026-10-10
 
 - The maintainer reports a static iPad screen eventually going black, while gaming remains connected for over ten minutes. Actual receiver logs show the previous four-second stale-video error; the controller also replaced media with slate after three seconds. These timers incorrectly equated missing changed frames with disconnect.

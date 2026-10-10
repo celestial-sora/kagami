@@ -34,10 +34,12 @@ def activate(application):
             window.run_task = lambda task, complete: (task(), complete(None))
             from kagami_receiver.controller import Receiver
             from unittest.mock import patch
+            window.size.set_selected(window.sizes.index((1920, 1080)))
             with patch.object(Receiver, "start", lambda _, transport: starts.append(transport)):
                 window.start_receiver(None)
             assert len(starts) == 1 and starts[0].identity.connection == "airplay"
             assert "Screen Mirroring" in window.status.get_text()
+            assert (window.receiver.config.width, window.receiver.config.height) == (1920, 1080)
             window.mode.set_selected(3)
             assert window.transport_panels[2].get_visible()
             assert window.device.get_visible()

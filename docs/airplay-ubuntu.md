@@ -8,6 +8,12 @@ Run the [one-command installer](installation.md), then open Kagami. Choose **Air
 
 AirPlay needs ordinary LAN access and Avahi/mDNS discovery; it does not require P2P-client/P2P-GO or disconnect the Wi-Fi adapter. Native Galaxy Smart View is a Miracast sender. A Samsung device would require a separate AirPlay sender implementation; no Android sender app has been selected or validated here.
 
+## Camera output size
+
+For 1920×1080 output, stop Kagami and deactivate its camera source in OBS/Discord (or close the consumer), select **1920×1080**, then start Kagami and reactivate the camera source. A consumer holding the old capture buffers pins the previous dimensions even after Kagami stops. The receiver checks available dimensions before starting AirPlay and explains how to release the camera if the requested size is blocked; Start remains retryable.
+
+The selected size controls the Virtual Camera output. AirPlay's input canvas remains 1280×720, so selecting 1080p scales that canvas. The maintainer confirms 1080p works after releasing the OBS camera.
+
 ## Media and lifecycle
 
 Kagami passes the documented `-vrtp` forwarding option to UxPlay. Decrypted H264 is packetized as RTP payload 96 and forwarded only to `127.0.0.1` on a dynamically chosen local UDP port. Kagami's own GStreamer decoder accepts that loopback stream, decodes it, and normalizes it into I420 1280×720 with aspect-preserving side/top borders. The identified Screen Input loopback feeds the same crop/rotation/mirror/FPS/output pipeline as Smart View and ADB.

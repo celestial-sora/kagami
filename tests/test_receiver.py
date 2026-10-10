@@ -147,6 +147,18 @@ class LifecycleTests(unittest.TestCase):
             self.transport.stop.assert_called_once()
             self.assertEqual(self.receiver.state, "stopped")
 
+    def test_camera_size_failure_does_not_start_transport_and_releases_ownership(self):
+        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {"XDG_RUNTIME_DIR": directory}), \
+                patch("kagami_receiver.controller.query_device"), patch("kagami_receiver.controller.CameraOutput") as output:
+            output.return_value.start.side_effect = ReceiverError("format", "Release the camera in OBS")
+            with self.assertRaises(ReceiverError):
+                self.receiver.start(self.transport)
+            self.transport.start.assert_not_called()
+            output.return_value.stop.assert_called_once()
+            self.assertEqual(self.receiver.state, "stopped")
+            self.assertEqual(self.receiver.locks, [])
+            self.receiver._lock_devices()  # The failed start remains retryable.
+
     def test_disconnect_keeps_writer_and_slate_until_explicit_stop(self):
         with patch.object(self.receiver, "_lock_devices"), patch("kagami_receiver.controller.query_device"), patch("kagami_receiver.controller.CameraOutput") as output:
             writer = output.return_value
@@ -212,6 +224,39 @@ class RawFrameIntegrationTests(unittest.TestCase):
         self.Gst = gst()
         self.config = OutputConfig(width=64, height=64, fps=10)
         self.frame = FrameFormat(80, 60)
+
+    def test_camera_size_probe_rejects_pinned_720_and_accepts_1080(self):
+        from kagami_receiver.pipeline import CameraOutput
+        output = CameraOutput(OutputConfig(width=1920, height=1080), test_sink="fakesink")
+        camera = Mock()
+        pad = camera.get_static_pad.return_value
+        pad.query_caps.return_value = self.Gst.Caps.from_string("video/x-raw,format=YUY2,width=1280,height=720,framerate=30/1")
+        with self.assertRaises(ReceiverError) as error:
+            output._check_camera_size(camera)
+        self.assertEqual(error.exception.category, "format")
+        self.assertIn("1920×1080", str(error.exception))
+        self.assertIn("OBS/Discord", str(error.exception))
+        pad.query_caps.return_value = self.Gst.Caps.from_string("video/x-raw,format=YUY2,width=1920,height=1080,framerate=30/1")
+        output._check_camera_size(camera)
+        pad.query_caps.return_value = self.Gst.Caps.from_string("video/x-raw,format=YUY2,width=(int)[16,3840],height=(int)[16,3840]")
+        output._check_camera_size(camera)
+
+    def test_full_hd_writer_emits_complete_1080_frames(self):
+        from kagami_receiver.pipeline import CameraOutput
+        Gst = self.Gst
+        output = CameraOutput(OutputConfig(width=1920, height=1080), test_sink="appsink name=consumer max-buffers=2 drop=true sync=false")
+        try:
+            output.start()
+            consumer = output.pipeline.get_by_name("consumer")
+            for _ in range(3):
+                sample = consumer.emit("try-pull-sample", Gst.SECOND)
+                self.assertIsNotNone(sample)
+                caps = sample.get_caps().get_structure(0)
+                self.assertEqual((caps.get_value("width"), caps.get_value("height"), caps.get_string("format")), (1920, 1080, "YUY2"))
+                self.assertEqual(sample.get_buffer().get_size(), 1920 * 1080 * 2)
+                self.assertIsNone(output.error())
+        finally:
+            output.stop()
 
     def test_idle_airplay_repeats_real_camera_frame_and_disconnect_blacks_it(self):
         from kagami_receiver.airplay import AirPlayTransport, DISCONNECTED_EVENT

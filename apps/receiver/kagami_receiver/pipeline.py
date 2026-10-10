@@ -108,7 +108,13 @@ class CameraOutput:
             f"{QUEUE} ! videoconvert ! video/x-raw,format=YUY2,colorimetry=2:4:7:1,interlace-mode=progressive ! " +
             (self.test_sink or "v4l2sink name=camera sync=false"))
         if self.test_sink is None:
-            self.pipeline.get_by_name("camera").set_property("device", config.device)
+            camera = self.pipeline.get_by_name("camera")
+            camera.set_property("device", config.device)
+            # Probe before any buffers or AirPlay listener start. A consumer
+            # holding old V4L2 buffers pins the size even after our writer stops.
+            if self.pipeline.set_state(Gst.State.READY) == Gst.StateChangeReturn.FAILURE:
+                raise pipeline_error(Gst, self.pipeline) or ReceiverError("format", "Cannot open the Virtual Camera.")
+            self._check_camera_size(camera)
         self.source = self.pipeline.get_by_name("frames")
         pixels = bytes((0, 0, 0, 255)) * (config.width * config.height)
         self.black = Gst.Buffer.new_allocate(None, len(pixels), None)
@@ -120,6 +126,16 @@ class CameraOutput:
         self.fault = None
         self.writer = threading.Thread(target=self._write, daemon=True, name="kagami-camera-writer")
         self.writer.start()
+
+    def _check_camera_size(self, camera):
+        config = self.config
+        available = camera.get_static_pad("sink").query_caps(None)
+        wanted = self.Gst.Caps.from_string(
+            f"video/x-raw,format=YUY2,width={config.width},height={config.height}")
+        if not available.can_intersect(wanted):
+            raise ReceiverError("format", f"Cannot set {config.device} to {config.width}×{config.height}. "
+                                "Deactivate the Kagami camera in OBS/Discord or close the app using it, "
+                                "then click Start again. Camera size cannot change while a consumer holds it.")
 
     def _count(self, _pad, _info):
         self.frames += 1
