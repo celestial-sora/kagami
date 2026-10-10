@@ -14,6 +14,16 @@ Ubuntu 24.04 / 26.04 · Native GTK4 · Local-first · No account · MIT
 
 Kagami receives a phone's **mirrored screen**, lets you crop and adjust the picture, and publishes it as **Kagami Virtual Camera** on Ubuntu. No separate Kagami phone app, cloud relay, browser pairing page, or QR code is required.
 
+## Screenshots / ภาพหน้าจอ
+
+**Desktop ready for AirPlay / หน้าต่างก่อนเริ่ม AirPlay**
+
+![Kagami desktop with AirPlay selected and an empty live preview before starting the receiver](assets/screenshots/kagami-airplay-idle.png)
+
+**iPad connected through AirPlay / เชื่อมต่อ iPad ผ่าน AirPlay**
+
+![Kagami connected through AirPlay with an iPad home screen visible in the live preview](assets/screenshots/kagami-airplay-ipad.png)
+
 ## Install / ติดตั้ง
 
 Open a terminal on **Ubuntu 24.04 or 26.04** and run this as your normal desktop user:
