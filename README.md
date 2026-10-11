@@ -8,7 +8,7 @@
 
 **Phone / Tablet → Kagami → OBS / Discord**
 
-**Ubuntu / Ubuntu-based distros · Windows / Fedora coming soon**
+**Ubuntu / Debian / Arch / Fedora families · AppImage (x86_64) · Windows coming soon**
 
 Native GTK4 · Local-first · No account · MIT
 
@@ -35,7 +35,7 @@ Open a terminal on **Ubuntu 24.04 or 26.04** and run this as your normal desktop
 curl -fsSL https://github.com/celestial-sora/kagami/releases/latest/download/install-kagami.sh | bash
 ~~~
 
-The one-command installer targets Ubuntu 24.04 / 26.04. For other **Ubuntu-based distros**, see the [manual setup](docs/smartview-ubuntu.md). / ตัวติดตั้งคำสั่งเดียวใช้กับ Ubuntu 24.04 / 26.04 ส่วนดิสโทรที่ใช้ Ubuntu เป็นฐาน ดู[วิธีติดตั้งด้วยตนเอง](docs/smartview-ubuntu.md)
+The latest stable installer below retains its Ubuntu 24.04 / 26.04 scope. The development installer adds **Debian, Ubuntu/Debian derivatives, Arch/Arch derivatives and Fedora/Fedora derivatives**, plus an **x86_64 AppImage**. See [Linux distributions and AppImage](docs/linux-distributions.md) for the development command, downloads, minimum versions and validation limits. / ตัวติดตั้ง stable ด้านล่างยังใช้กับ Ubuntu ส่วนเวอร์ชันพัฒนาเพิ่ม Debian, Arch, Fedora และดิสโทรลูก พร้อม AppImage ดู[วิธีติดตั้งและข้อจำกัด](docs/linux-distributions.md)
 
 The latest stable installer selects its published release tag by default. The installer sets up the desktop app, receiver dependencies, and virtual camera. It may request your **sudo password**. If Secure Boot is enabled, camera-driver enrollment may also require a reboot. [Read the installation guide](docs/installation.md) or [inspect the script](install.sh) before running it.
 

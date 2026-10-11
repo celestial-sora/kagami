@@ -1,0 +1,20 @@
+#!/bin/sh
+set -eu
+if [ "$(id -u)" = 0 ]; then echo 'Run Kagami as your desktop user, never as root.' >&2; exit 2; fi
+kagami_appdir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+export PATH="$kagami_appdir/usr/bin:/usr/local/bin:/usr/bin:/bin"
+export GI_TYPELIB_PATH="$kagami_appdir/usr/lib/girepository-1.0"
+export GST_PLUGIN_SYSTEM_PATH_1_0="$kagami_appdir/usr/lib/gstreamer-1.0"
+export GST_PLUGIN_PATH_1_0=
+export GST_PLUGIN_SCANNER="$kagami_appdir/usr/libexec/gst-plugin-scanner"
+export GIO_MODULE_DIR="$kagami_appdir/usr/lib/gio/modules"
+export GSETTINGS_SCHEMA_DIR="$kagami_appdir/usr/share/glib-2.0/schemas"
+export XDG_DATA_DIRS="$kagami_appdir/usr/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+# A per-build cache prevents native/other AppImage plugin ABI collisions.
+GST_REGISTRY_1_0="${XDG_CACHE_HOME:-$HOME/.cache}/kagami/gst-$(cat "$kagami_appdir/BUILD-ID").bin"
+export GST_REGISTRY_1_0
+mkdir -p "${XDG_CACHE_HOME:-$HOME/.cache}/kagami"
+# RPATH is relative on every bundled ELF. No LD_LIBRARY_PATH/PYTHONHOME leaks
+# into the host systemctl, pkexec, broker or other privileged system tools.
+unset LD_LIBRARY_PATH PYTHONHOME PYTHONPATH
+exec "$kagami_appdir/usr/bin/python3" -I "$kagami_appdir/usr/share/kagami/appimage_bootstrap.py" "$@"

@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Ubuntu V2 bootstrap. curl stdin never feeds package/build commands.
+# Linux V2 bootstrap. curl stdin never feeds package/build commands.
 set -euo pipefail
 kagami_log() { printf '\nKagami · %s\n' "$*"; }
 kagami_fail() { printf '\nKagami: %s\n' "$*" >&2; return 2; }
 kagami_plan() {
     cat <<'PLAN'
-Kagami V2 installer · Ubuntu 24.04 / 26.04 desktop
+Kagami V2 installer · Ubuntu 24.04 / 26.04, Debian 12+, Arch, Fedora desktops
   1. Check the requested commit against the active installed version.
   2. Download only if an update or --repair is needed.
   3. Install dependencies and matching camera/kernel prerequisites.
@@ -23,19 +23,60 @@ Installation does not disconnect Wi-Fi or start a mirroring session.
 KAGAMI_REF accepts a branch, release tag or full commit; default: main.
 PLAN
 }
+# ID wins over ID_LIKE; derivatives inherit their package family.
+kagami_distribution() {
+    local major=${VERSION_ID:-0}
+    major=${major%%.*}
+    case ${ID:-} in
+        ubuntu|debian) KAGAMI_FAMILY=debian ;;
+        arch) KAGAMI_FAMILY=arch ;;
+        fedora) KAGAMI_FAMILY=rpm ;;
+        rhel|centos|rocky|almalinux|ol) kagami_fail 'Enterprise Linux is outside the current supported targets.'; return 2 ;;
+        *)
+            case " ${ID_LIKE:-} " in
+                *' ubuntu '*|*' debian '*) KAGAMI_FAMILY=debian ;;
+                *' arch '*) KAGAMI_FAMILY=arch ;;
+                *' rhel '*|*' centos '*) kagami_fail 'Enterprise Linux is outside the current supported targets.'; return 2 ;;
+                *' fedora '*) KAGAMI_FAMILY=rpm ;;
+                *) kagami_fail "Unsupported distribution: ${ID:-unknown}. Use a Debian, Arch or Fedora family desktop."; return 2 ;;
+            esac ;;
+    esac
+    if [[ ${ID:-} == ubuntu && ${major} -lt 24 ]] ||
+       [[ ${ID:-} == debian && ${major} -lt 12 ]]; then
+        kagami_fail 'Use Ubuntu 24.04+ or Debian 12+ and derivatives with Python 3.10+, GTK 4.8+, GStreamer 1.20+.'; return 2
+    fi
+}
 kagami_platform() {
     (( EUID != 0 )) || { kagami_fail 'Run as your desktop user, without sudo. System setup will request authentication.'; return 2; }
-    [[ $(uname -s) == Linux ]] || { kagami_fail 'This installer supports Ubuntu desktops.'; return 2; }
+    [[ $(uname -s) == Linux ]] || { kagami_fail 'This installer supports Linux desktops.'; return 2; }
     # shellcheck source=/dev/null
     . /etc/os-release
-    [[ ${ID:-} == ubuntu && ( ${VERSION_ID:-} == 24.04 || ${VERSION_ID:-} == 26.04 ) ]] || {
-        kagami_fail 'Use an Ubuntu 24.04 or 26.04 desktop. The former browser URL/QR bridge has been removed.'; return 2;
-    }
+    kagami_distribution
+    [[ ! -e /run/ostree-booted ]] || { kagami_fail 'Immutable/Atomic desktops need manual host prerequisites; do not run this mutable-host installer.'; return 2; }
     if command -v systemd-detect-virt >/dev/null && systemd-detect-virt --container --quiet; then
         kagami_fail 'Install on the desktop host, not in a container.'; return 2
     fi
+    [[ -d /run/systemd/system ]] || { kagami_fail 'A systemd desktop host is required for discovery and camera services.'; return 2; }
     command -v sudo >/dev/null || { kagami_fail 'sudo is required for dependencies and the camera driver.'; return 2; }
     [[ -r /dev/tty && -w /dev/tty ]] || { kagami_fail 'Run the curl command in an interactive terminal for authentication.'; return 2; }
+}
+kagami_packages() {
+    # Package/repository errors stay visible. Never silently enable third-party repositories.
+    case ${KAGAMI_FAMILY:?} in
+        debian) sudo apt-get install -y "$@" ;;
+        arch) sudo pacman -S --needed --noconfirm "$@" ;;
+        rpm) sudo dnf install -y --setopt=gpgcheck=1 "$@" || {
+            kagami_fail 'Missing RPM prerequisites: check the documented Fedora package and codec prerequisites, then rerun. Signatures/SELinux are never disabled.'; return 2;
+        } ;;
+    esac
+}
+kagami_refresh_packages() {
+    case ${KAGAMI_FAMILY:?} in
+        debian) sudo apt-get update < /dev/null ;;
+        # Arch must perform a full upgrade, never a partial -Sy install.
+        arch) sudo pacman -Syu --noconfirm < /dev/null ;;
+        rpm) sudo dnf makecache < /dev/null ;;
+    esac
 }
 kagami_resolve_ref() {
     local ref=$1 refs
@@ -78,7 +119,7 @@ kagami_camera_module() {
 kagami_secure_boot() {
     local certificate
     if ! LC_ALL=C mokutil --sb-state 2>/dev/null | grep -q 'SecureBoot enabled'; then return 0; fi
-    for certificate in /var/lib/shim-signed/mok/MOK.der /var/lib/dkms/mok.pub; do
+    for certificate in /var/lib/shim-signed/mok/MOK.der /var/lib/dkms/mok.pub /var/lib/dkms/mok.der; do
         if sudo test -f "$certificate"; then
             if sudo mokutil --test-key "$certificate" >/dev/null 2>&1; then return 0; fi
             kagami_log 'Secure Boot: set an enrollment password; on reboot choose Enroll MOK and confirm it.'
@@ -88,7 +129,7 @@ kagami_secure_boot() {
             return 10
         fi
     done
-    kagami_fail 'Secure Boot is enabled but no DKMS signing certificate was found. Configure Ubuntu DKMS signing, then rerun.'
+    kagami_fail 'Secure Boot is enabled but no DKMS signing certificate was found. Configure DKMS signing for this distribution, then rerun.'
 }
 kagami_install_miraclecast() {
     local source=$1 stage=$2 binary
@@ -113,15 +154,9 @@ kagami_install_miraclecast() {
     /usr/local/bin/miracle-wifid --help > /dev/null
     /usr/local/bin/miracle-sinkctl --help > /dev/null
 }
-kagami_install_dependencies() {
-    local running=$1
-    # shellcheck disable=SC2024
-    sudo -v < /dev/tty
-    kagami_log '[3/6] Install: Ubuntu dependencies and camera driver'
-    sudo apt-get update < /dev/null
-    # DKMS/shim-signed can ask for MOK enrollment via debconf on the terminal.
-    # shellcheck disable=SC2024
-    sudo apt-get install -y git build-essential meson ninja-build cmake pkg-config libglib2.0-dev \
+kagami_dependency_packages() {
+    case ${KAGAMI_FAMILY:?} in
+        debian) printf '%s\n' git build-essential meson ninja-build cmake pkg-config libglib2.0-dev \
         libreadline-dev libudev-dev libsystemd-dev python3 python3-gi python3-gi-cairo \
         libssl-dev libplist-dev libavahi-compat-libdnssd-dev libgstreamer1.0-dev \
         libgstreamer-plugins-base1.0-dev avahi-daemon \
@@ -129,7 +164,80 @@ kagami_install_dependencies() {
         gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
         gstreamer1.0-libav iw network-manager wpasupplicant pkexec polkitd \
         iproute2 dbus v4l-utils v4l2loopback-dkms v4l2loopback-utils dkms mokutil \
-        "linux-headers-$running" < /dev/tty
+        ;;
+        arch) printf '%s\n' git base-devel meson ninja cmake pkgconf glib2 readline systemd \
+                openssl libplist avahi gstreamer gst-plugins-base gst-plugins-good gst-plugins-bad \
+                gst-libav gst-python python python-gobject python-cairo gtk4 iw networkmanager \
+                wpa_supplicant polkit iproute2 dbus v4l-utils v4l2loopback-dkms v4l2loopback-utils \
+                dkms mokutil ;;
+        rpm) printf '%s\n' git gcc gcc-c++ make meson ninja-build cmake pkgconf-pkg-config \
+                glib2-devel readline-devel systemd-devel openssl-devel libplist-devel \
+                avahi-compat-libdns_sd-devel gstreamer1-devel gstreamer1-plugins-base-devel \
+                avahi python3 python3-gobject python3-cairo python3-gstreamer1 gtk4 \
+                gstreamer1-plugins-base gstreamer1-plugins-good gstreamer1-plugins-bad-free \
+                gstreamer1-plugin-libav iw NetworkManager wpa_supplicant polkit iproute dbus \
+                v4l-utils dkms mokutil ;;
+    esac
+}
+kagami_arch_kernel_package() {
+    local running=$1 owner
+    owner=$(pacman -Qoq "/usr/lib/modules/$running/pkgbase" 2>/dev/null) || owner=''
+    if [[ -z $owner && -r /usr/lib/modules/$running/pkgbase ]]; then
+        owner=$(cat "/usr/lib/modules/$running/pkgbase")
+    fi
+    if [[ -z $owner ]]; then
+        kagami_log 'Kernel setup pending: running Arch kernel is no longer installed after the full upgrade. Reboot into the installed kernel and rerun.'; return 10
+    fi
+    [[ $owner =~ ^[a-zA-Z0-9][a-zA-Z0-9+_.-]*$ ]] || { kagami_fail 'Invalid kernel package name.'; return 2; }
+    printf '%s-headers\n' "$owner"
+}
+kagami_install_dependencies() {
+    local running=$1 headers
+    local packages=()
+    # shellcheck disable=SC2024
+    sudo -v < /dev/tty
+    kagami_log "[3/6] Install: $KAGAMI_FAMILY dependencies and matching kernel headers"
+    kagami_refresh_packages
+    mapfile -t packages < <(kagami_dependency_packages)
+    case $KAGAMI_FAMILY in
+        debian) packages+=("linux-headers-$running") ;;
+        arch)
+            headers=$(kagami_arch_kernel_package "$running") || return $?
+            packages+=("$headers") ;;
+        rpm) packages+=("kernel-devel-$running" kernel-headers) ;;
+    esac
+    # DKMS/shim may request Secure Boot enrollment through the terminal.
+    # shellcheck disable=SC2024
+    kagami_packages "${packages[@]}" < /dev/tty
+    [[ -f /lib/modules/$running/build/Makefile ]] || {
+        kagami_log "Kernel setup pending: no matching build headers for $running. Reboot if your kernel was updated, then rerun."; return 10;
+    }
+    python3 - <<'PYTHON'
+import sys
+if sys.version_info < (3, 10):
+    raise SystemExit('Python 3.10+ required; use a newer distribution.')
+import gi
+gi.require_version('Gtk', '4.0')
+gi.require_version('Gst', '1.0')
+from gi.repository import Gtk, Gst
+if (Gtk.get_major_version(), Gtk.get_minor_version()) < (4, 8) or Gst.version()[:2] < (1, 20):
+    raise SystemExit('GTK 4.8+ and GStreamer 1.20+ required; use a newer distribution.')
+PYTHON
+}
+kagami_install_camera_source() {
+    local source=$1 stage=$2
+    # Debian/Arch provide their own signed package + DKMS recipe. RPM uses
+    # pinned upstream only if no existing v4l2loopback DKMS registration exists.
+    [[ $KAGAMI_FAMILY == rpm ]] || return 0
+    if dkms status -m v4l2loopback | grep -q '^v4l2loopback/'; then
+        command -v v4l2loopback-ctl >/dev/null || { kagami_fail 'Install v4l2loopback-ctl matching your existing driver.'; return 2; }
+        return 0
+    fi
+    bash "$source/tools/build-v4l2loopback.sh" "$stage/loopback" "$stage/loopback-payload" < /dev/null
+    sudo cp -a "$stage/loopback-payload/usr/src/v4l2loopback-0.15.4" /usr/src/
+    sudo chown -R root:root /usr/src/v4l2loopback-0.15.4
+    sudo install -D -o root -g root -m 755 "$stage/loopback-payload/usr/local/bin/v4l2loopback-ctl" /usr/local/bin/v4l2loopback-ctl
+    sudo dkms add -m v4l2loopback -v 0.15.4 < /dev/null
 }
 kagami_install_airplay() {
     local source=$1 stage=$2 item
@@ -182,8 +290,8 @@ kagami_main() {
         kagami_log '[1/6] Check: installing git for version resolution'
         # shellcheck disable=SC2024
         sudo -v < /dev/tty
-        sudo apt-get update < /dev/null
-        sudo apt-get install -y git < /dev/null
+        kagami_refresh_packages
+        kagami_packages git < /dev/null
     fi
     sha=$(kagami_resolve_ref "$ref")
     [[ $sha =~ ^[0-9a-f]{40}$ ]] || { kagami_fail 'Remote ref did not resolve to a commit.'; return 2; }
@@ -211,6 +319,7 @@ kagami_main() {
     [[ $(git -C "$source" rev-parse HEAD) == "$sha" ]] || { kagami_fail 'Downloaded commit differs from the checked version.'; return 2; }
     running=$(uname -r)
     kagami_install_dependencies "$running"
+    kagami_install_camera_source "$source" "$stage"
     kagami_camera_module "$running"
     if kagami_secure_boot; then :; else
         status=$?

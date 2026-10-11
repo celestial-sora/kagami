@@ -42,6 +42,16 @@ jobs:
           bash tools/build-release.sh "$RUNNER_TEMP/kagami-release"
           shellcheck "$RUNNER_TEMP/kagami-release/install-kagami.sh"
           bash "$RUNNER_TEMP/kagami-release/install-kagami.sh" --dry-run
+      - name: Add the checked main CI AppImage and recompute checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_id=$(gh api "repos/$GH_REPO/actions/runs?head_sha=$GITHUB_SHA&event=push&per_page=30" \
+            --jq '.workflow_runs[] | select(.path == ".github/workflows/ci.yml" and .conclusion == "success") | .id' | head -n 1)
+          gh run download "$run_id" --name kagami-appimage-x86_64 --dir "$RUNNER_TEMP/checked-appimage"
+          (cd "$RUNNER_TEMP/checked-appimage"; sha256sum --check SHA256SUMS)
+          cp "$RUNNER_TEMP/checked-appimage/Kagami-$(cat VERSION)-x86_64.AppImage" "$RUNNER_TEMP/kagami-release/"
+          (cd "$RUNNER_TEMP/kagami-release"; sha256sum Kagami-*-x86_64.AppImage >> SHA256SUMS)
       - name: Create draft, verify uploaded bytes, then publish stable
         shell: bash
         run: |

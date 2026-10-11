@@ -155,7 +155,7 @@ class AirPlayTransport:
         if self.disconnected.is_set():
             return ReceiverError("connectivity", "AirPlay device disconnected. Stop mirroring on the device, then restart Kagami reception.")
         if self.audio_failed.is_set():
-            return ReceiverError("decoder", "AirPlay audio output failed. Check Ubuntu's sound output and user audio service, then restart reception.")
+            return ReceiverError("decoder", "AirPlay audio output failed. Check your desktop sound output and user audio service, then restart reception.")
         if self.pipeline:
             if error := pipeline_error(self.Gst, self.pipeline):
                 return error

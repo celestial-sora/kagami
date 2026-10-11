@@ -31,6 +31,7 @@ class ReceiverInstallerTests(unittest.TestCase):
 kagami_platform() { :; }
 kagami_install_dependencies() { :; }
 kagami_camera_module() { :; }
+kagami_install_camera_source() { :; }
 kagami_secure_boot() { [[ $KAGAMI_TEST_MODE != mok-pending ]] || return 10; }
 kagami_install_miraclecast() { :; }
 kagami_install_airplay() { :; }
