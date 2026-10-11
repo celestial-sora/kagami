@@ -34,7 +34,7 @@ Kagami turns a compatible phone or tablet screen into a **V4L2 virtual camera** 
 
 ### Stable release · Recommended
 
-**Ubuntu 24.04 / 26.04 and Manjaro Linux**
+**Ubuntu 24.04 / 26.04 · Arch-based Linux (Arch, Manjaro, EndeavourOS, CachyOS)**
 
 Install the latest published stable version:
 
@@ -42,7 +42,7 @@ Install the latest published stable version:
 curl -fsSL https://github.com/celestial-sora/kagami/releases/latest/download/install-kagami.sh | bash
 ```
 
-The latest stable release includes Manjaro support, confirmed by maintainer testing. Run as your **normal desktop user**; the installer requests system authentication when needed. [View the latest release and version →](https://github.com/celestial-sora/kagami/releases/latest)
+The stable installer supports the Arch-based package family through `pacman`. **Manjaro has been tested by the maintainer**; Arch Linux, EndeavourOS, CachyOS and other derivatives share the installation path but still need separate real-device verification. Package repositories and kernel headers can differ between distributions. Run as your **normal desktop user**; the installer requests system authentication when needed. [View the latest release and version →](https://github.com/celestial-sora/kagami/releases/latest)
 
 <details>
 <summary><strong>Development (Beta) · Testing new changes</strong></summary>
@@ -72,8 +72,7 @@ Host camera drivers and discovery services are still required. See the [AppImage
 | :-- | :-- | :-- |
 | **Ubuntu 24.04 / 26.04** | `apt` | Real iPad → Kagami → OBS verified on Ubuntu 26.04 |
 | **Debian 12+** · Linux Mint · Pop!_OS | `apt` | Userspace CI; desktop/device testing pending |
-| **Manjaro Linux** | `pacman` | Stable release tested by maintainer; device-specific features may vary |
-| **Arch Linux** · **EndeavourOS** | `pacman` | Arch userspace CI; device testing pending |
+| **Arch-based**: Arch Linux, Manjaro, EndeavourOS, CachyOS and compatible derivatives | `pacman` | Stable installer family; Manjaro tested by maintainer, Arch userspace CI passed; other desktop/device testing pending |
 | **Fedora Workstation** and compatible derivatives | `dnf` | Userspace CI; desktop/device testing pending |
 
 **Requirements:** systemd desktop, Python 3.10+, GTK 4.8+, GStreamer 1.22+, matching headers for your running kernel, and V4L2 camera support.
