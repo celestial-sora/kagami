@@ -1,81 +1,127 @@
 <div align="center">
 
-<img src="assets/kagami-icon.webp" width="144" height="144" alt="Kagami app icon">
+<img src="assets/kagami-icon.webp" alt="Kagami icon" width="128">
 
 # Kagami · 鏡
 
-**Your phone screen, now a virtual camera.**
+### Your phone screen. Your virtual camera.
 
-Phone / Tablet → Kagami → OBS / Discord
+**Mirror from your phone to Linux, then use it in OBS.**
 
-**Linux · Windows in development**
+[![Latest release](https://img.shields.io/github/v/release/celestial-sora/kagami?label=Release&style=flat-square)](https://github.com/celestial-sora/kagami/releases/latest)
+[![CI](https://img.shields.io/github/actions/workflow/status/celestial-sora/kagami/ci.yml?branch=main&label=Checks&style=flat-square)](https://github.com/celestial-sora/kagami/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-555?style=flat-square)](LICENSE)
 
-Local-first · No account · MIT
+[**Install**](#install) · [**Supported Linux**](#linux-support) · [**How it works**](#how-it-works) · [**Latest release**](https://github.com/celestial-sora/kagami/releases/latest)
+
+<img src="assets/screenshots/kagami-airplay-ipad.png" alt="iPad AirPlay mirroring in the Kagami desktop app" width="760">
+
+<sub>Real iPad AirPlay preview in Kagami. No Kagami mobile app required.</sub>
 
 </div>
 
-Mirror your phone screen, crop and adjust the picture, then use **Kagami Virtual Camera** in your desktop apps. No separate Kagami phone app or cloud relay required.
+## What is Kagami?
 
-รับภาพหน้าจอมือถือ ปรับ Crop แล้วส่งเป็น **Kagami Virtual Camera** ให้แอปบนคอม ไม่ต้องติดตั้งแอป Kagami บนมือถือหรือใช้ Cloud
+Kagami turns a compatible phone or tablet screen into a **V4L2 virtual camera** on Linux. Mirror locally, adjust your framing, and select **Kagami Virtual Camera** in OBS.
 
-<details>
-<summary><strong>Screenshots — click to expand / ภาพหน้าจอ — กดเพื่อเปิด</strong></summary>
+- **Local-first.** No account or cloud relay.
+- **Wireless mirroring.** AirPlay for Apple devices; experimental Samsung Smart View.
+- **Camera-ready.** Crop, rotate and mirror your preview before sending it to OBS.
 
-Click a preview to view the full-size image. / คลิกภาพตัวอย่างเพื่อดูขนาดเต็ม
+> **ภาษาไทย:** Kagami รับภาพหน้าจอมือถือผ่านเครือข่ายภายใน แล้วส่งเป็น Virtual Camera บน Linux สำหรับ OBS โดยไม่ต้องติดตั้งแอป Kagami ในมือถือ
 
-| Ready for AirPlay / ก่อนเริ่ม AirPlay | iPad via AirPlay / iPad ผ่าน AirPlay |
-| :---: | :---: |
-| [<img src="assets/screenshots/kagami-airplay-idle.png" width="360" alt="Kagami desktop before starting AirPlay">](assets/screenshots/kagami-airplay-idle.png) | [<img src="assets/screenshots/kagami-airplay-ipad.png" width="360" alt="Kagami live preview showing an iPad connected through AirPlay">](assets/screenshots/kagami-airplay-ipad.png) |
+## Install
 
-</details>
+**Linux development installer** (Ubuntu, Debian, Arch, Manjaro, EndeavourOS and Fedora families):
 
-## Platforms / แพลตฟอร์ม
-
-- **Linux:** Ubuntu 24.04/26.04, Debian, Arch, Fedora and compatible derivatives. Ubuntu is the primary desktop; other families have userspace CI coverage and still need full desktop/device testing.
-- **AppImage:** x86_64, glibc 2.39+. Host camera drivers and services are required.
-- **Windows:** In development / อยู่ระหว่างพัฒนา — download and setup instructions will follow when a build is available.
-
-## Install / ติดตั้ง
-
-For the current **Linux development version**, run as your normal desktop user:
-
-~~~bash
+```bash
 curl -fsSL https://raw.githubusercontent.com/celestial-sora/kagami/main/install.sh | bash
-~~~
+```
 
-ติดตั้งเวอร์ชันพัฒนา Linux ด้วยบัญชีผู้ใช้ปกติ ตัวติดตั้งอาจขอรหัส sudo และให้รีบูตเพื่อตั้งค่าไดรเวอร์กล้อง หากทดสอบใน VM ให้ติดตั้งระบบลงดิสก์ก่อน ไม่ใช้ Live ISO
+Run as your **normal desktop user**, not with `sudo` in front of the command. The installer requests authentication only for system prerequisites. Running the same command again checks for updates.
 
-The camera driver needs headers for the running kernel. Custom kernels are supported when matching headers are installed under `/lib/modules/$(uname -r)/build`. On Arch/Manjaro, reboot into the updated kernel and rerun the installer if a full system upgrade replaced the currently running kernel. Smart View requires Wi-Fi P2P client/GO support from the adapter and its Linux driver; AirPlay remains available without P2P.
+> [!NOTE]
+> This installs the latest **development** commit, not a pinned stable release. The published stable installer may support fewer distributions. Check [Releases](https://github.com/celestial-sora/kagami/releases/latest) for the latest published assets and release notes.
 
 <details>
-<summary><strong>Stable release · Ubuntu 24.04 / 26.04</strong></summary>
+<summary><strong>Stable installer · Ubuntu 24.04 / 26.04</strong></summary>
 
-The latest published stable installer retains its Ubuntu scope. / ตัวติดตั้ง stable ล่าสุดยังใช้กับ Ubuntu
-
-~~~bash
+```bash
 curl -fsSL https://github.com/celestial-sora/kagami/releases/latest/download/install-kagami.sh | bash
-~~~
+```
+
+Use the stable command only on the platforms supported by the release's own notes. It may not include the newer Arch/Manjaro/Fedora installer changes.
 
 </details>
 
-**AppImage:** Download `kagami-appimage-x86_64` from a successful [Checks run](https://github.com/celestial-sora/kagami/actions/workflows/ci.yml). [Setup and requirements →](docs/linux-distributions.md#appimage)
+<details>
+<summary><strong>AppImage · x86_64</strong></summary>
 
-## Connect / เชื่อมต่อ
+Find the AppImage artifact in [successful CI runs](https://github.com/celestial-sora/kagami/actions/workflows/ci.yml) or in a release when one is attached.
 
-| Device / อุปกรณ์ | Mode / วิธีเชื่อมต่อ |
-| :--- | :--- |
-| iPhone / iPad / Mac | **AirPlay** — Screen Mirroring; same LAN / อยู่ใน LAN เดียวกัน |
-| Samsung Galaxy | **Smart View** — experimental; adapter and Linux driver must support Wi-Fi P2P client/GO / ขั้นทดลอง อะแดปเตอร์และไดรเวอร์ Linux ต้องรองรับ Wi-Fi P2P |
-| Android | **USB / Wi-Fi ADB** — authorized debugging, adb and scrcpy 3.0+ / อนุญาต debugging และติดตั้ง adb กับ scrcpy แยก |
+The AppImage still needs host camera drivers, camera node permissions and discovery services. Follow the [AppImage setup guide](docs/linux-distributions.md#appimage) before running it.
 
-Open Kagami → choose a mode → **Check** → **Start** → connect your phone → apply a crop. In OBS on Linux, add **Video Capture Device (V4L2)** and select **Kagami Virtual Camera**. Click **Stop** when finished.
+</details>
 
-เปิด Kagami → เลือกโหมด → **Check** → **Start** → เชื่อมต่อมือถือ → ปรับ Crop จากนั้นใน OBS บน Linux เพิ่ม **Video Capture Device (V4L2)** แล้วเลือก **Kagami Virtual Camera** เลิกใช้ให้กด **Stop**
+## Linux support
 
-Real iPad video in Kagami and OBS is verified on Ubuntu 26.04. Galaxy end-to-end testing remains pending. AirPlay audio goes to desktop output; use OBS Desktop Audio to capture it.
+| Distribution | Install method | Validation |
+| :-- | :-- | :-- |
+| **Ubuntu 24.04 / 26.04** | `apt` | Real iPad → Kagami → OBS verified on Ubuntu 26.04 |
+| **Debian 12+** · Linux Mint · Pop!_OS | `apt` | Userspace CI; desktop/device testing pending |
+| **Arch Linux** · **Manjaro** · **EndeavourOS** | `pacman` | Arch userspace CI; Manjaro/EndeavourOS device testing pending |
+| **Fedora Workstation** and compatible derivatives | `dnf` | Userspace CI; desktop/device testing pending |
 
-[Installation & troubleshooting](docs/installation.md) · [Linux requirements](docs/linux-distributions.md) · [Validation status](docs/validation.md)
+**Requirements:** systemd desktop, Python 3.10+, GTK 4.8+, GStreamer 1.22+, matching headers for your running kernel, and V4L2 camera support.
+
+Arch-based installs perform a full `pacman -Syu` to avoid partial upgrades. On Manjaro, **reboot into your updated kernel** if needed before rerunning the installer. Unsupported environments include immutable/Atomic desktops and non-systemd hosts.
+
+[**Full distribution compatibility & kernel notes →**](docs/linux-distributions.md)
+
+## How it works
+
+| Your device | Connect with | Status |
+| :-- | :-- | :-- |
+| iPhone / iPad / Mac | **AirPlay** · Screen Mirroring on the same local network | iPad video verified on Ubuntu |
+| Samsung Galaxy | **Smart View** · Wi-Fi Direct (P2P) | Experimental; P2P-capable adapter required |
+| Android | **USB or Wi-Fi ADB** · scrcpy 3.0+ | Requires separate authorized ADB/scrcpy setup |
+
+1. Open **Kagami** from your applications menu.
+2. Choose a connection mode, then **Check → Start**.
+3. Connect your phone and adjust your crop.
+4. In OBS, add **Video Capture Device (V4L2)** and select **Kagami Virtual Camera**.
+
+<div align="center">
+
+<img src="assets/screenshots/kagami-airplay-idle.png" alt="Kagami AirPlay idle screen" width="49%">
+<img src="assets/screenshots/kagami-airplay-ipad.png" alt="Kagami displaying an iPad AirPlay stream" width="49%">
+
+<sub>AirPlay: ready → connected</sub>
+
+</div>
+
+> [!IMPORTANT]
+> Successful installation or CI does **not** prove every phone and Linux distribution works end to end. Real Samsung Smart View, further Apple devices, Secure Boot and distro-specific kernel/camera behavior still need physical testing.
+
+## Help & development
+
+[**Installation guide**](docs/installation.md) · [**Linux / AppImage details**](docs/linux-distributions.md) · [**Tested behavior**](docs/validation.md) · [**Issues**](https://github.com/celestial-sora/kagami/issues)
+
+<details>
+<summary><strong>Technical notes</strong></summary>
+
+Kagami uses GTK4, GStreamer, a V4L2 loopback camera and local discovery. Its Linux receiver integrates UxPlay for AirPlay and MiracleCast for experimental Smart View. The app preserves settings, crop presets and previous installed versions for rollback. AirPlay audio plays through desktop output for capture via OBS Desktop Audio.
+
+The development installer builds required backend components locally. Kernel headers must match `uname -r`; Secure Boot may require DKMS MOK enrollment and a reboot. Hardware and distribution validation details are maintained in [docs/validation.md](docs/validation.md).
+
+</details>
 
 ---
 
-[MIT](LICENSE) · Contributor: **celestail-sora** ([celestial-sora](https://github.com/celestial-sora)) · UxPlay and MiracleCast retain their upstream licenses.
+<div align="center">
+
+Made by [celestial-sora](https://github.com/celestial-sora) · [MIT License](LICENSE)
+
+<sub>Third-party components retain their respective upstream licenses.</sub>
+
+</div>
