@@ -45,6 +45,8 @@ curl -fsSL https://raw.githubusercontent.com/celestial-sora/kagami/main/install.
 
 ติดตั้งเวอร์ชันพัฒนา Linux ด้วยบัญชีผู้ใช้ปกติ ตัวติดตั้งอาจขอรหัส sudo และให้รีบูตเพื่อตั้งค่าไดรเวอร์กล้อง หากทดสอบใน VM ให้ติดตั้งระบบลงดิสก์ก่อน ไม่ใช้ Live ISO
 
+The camera driver needs headers for the running kernel. Custom kernels are supported when matching headers are installed under `/lib/modules/$(uname -r)/build`. On Arch/Manjaro, reboot into the updated kernel and rerun the installer if a full system upgrade replaced the currently running kernel. Smart View requires Wi-Fi P2P client/GO support from the adapter and its Linux driver; AirPlay remains available without P2P.
+
 <details>
 <summary><strong>Stable release · Ubuntu 24.04 / 26.04</strong></summary>
 
@@ -63,7 +65,7 @@ curl -fsSL https://github.com/celestial-sora/kagami/releases/latest/download/ins
 | Device / อุปกรณ์ | Mode / วิธีเชื่อมต่อ |
 | :--- | :--- |
 | iPhone / iPad / Mac | **AirPlay** — Screen Mirroring; same LAN / อยู่ใน LAN เดียวกัน |
-| Samsung Galaxy | **Smart View** — experimental; Linux Wi-Fi Direct adapter required / ขั้นทดลอง ต้องมีอะแดปเตอร์ที่รองรับ |
+| Samsung Galaxy | **Smart View** — experimental; adapter and Linux driver must support Wi-Fi P2P client/GO / ขั้นทดลอง อะแดปเตอร์และไดรเวอร์ Linux ต้องรองรับ Wi-Fi P2P |
 | Android | **USB / Wi-Fi ADB** — authorized debugging, adb and scrcpy 3.0+ / อนุญาต debugging และติดตั้ง adb กับ scrcpy แยก |
 
 Open Kagami → choose a mode → **Check** → **Start** → connect your phone → apply a crop. In OBS on Linux, add **Video Capture Device (V4L2)** and select **Kagami Virtual Camera**. Click **Stop** when finished.
