@@ -185,7 +185,7 @@ kagami_arch_kernel_package() {
         owner=$(cat "/usr/lib/modules/$running/pkgbase")
     fi
     if [[ -z $owner ]]; then
-        kagami_log "Kernel setup pending: running Arch kernel $running is not installed on this system, so matching headers cannot be selected. Reboot into an installed kernel and rerun the installer." >&2
+        kagami_log "Kernel setup pending: no package metadata or matching headers were found for running Arch kernel $running. Install its headers or boot into an installed kernel, then rerun the installer." >&2
         return 10
     fi
     [[ $owner =~ ^[a-zA-Z0-9][a-zA-Z0-9+_.-]*$ ]] || { kagami_fail 'Invalid kernel package name.'; return 2; }
@@ -199,13 +199,18 @@ kagami_install_dependencies() {
     kagami_log "[3/6] Install: $KAGAMI_FAMILY dependencies and matching kernel headers"
     kagami_refresh_packages
     mapfile -t packages < <(kagami_dependency_packages)
-    case $KAGAMI_FAMILY in
-        debian) packages+=("linux-headers-$running") ;;
-        arch)
-            headers=$(kagami_arch_kernel_package "$running") || return $?
-            packages+=("$headers") ;;
-        rpm) packages+=("kernel-devel-$running" kernel-headers) ;;
-    esac
+    # A matching build tree is sufficient, including for custom kernels whose
+    # headers were installed outside the distribution's usual package name.
+    if [[ ! -f /lib/modules/$running/build/Makefile ]]; then
+        case $KAGAMI_FAMILY in
+            debian) packages+=("linux-headers-$running") ;;
+            arch)
+                headers=$(kagami_arch_kernel_package "$running") || return $?
+                packages+=("$headers") ;;
+            rpm) packages+=("kernel-devel-$running") ;;
+        esac
+    fi
+    if [[ $KAGAMI_FAMILY == rpm ]]; then packages+=(kernel-headers); fi
     # DKMS/shim may request Secure Boot enrollment through the terminal.
     # shellcheck disable=SC2024
     kagami_packages "${packages[@]}" < /dev/tty
@@ -220,6 +225,7 @@ import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Gst', '1.0')
 from gi.repository import Gtk, Gst
+Gst.init(None)
 if (Gtk.get_major_version(), Gtk.get_minor_version()) < (4, 8) or Gst.version()[:2] < (1, 22):
     raise SystemExit('GTK 4.8+ and GStreamer 1.22+ required; use a newer distribution.')
 PYTHON
