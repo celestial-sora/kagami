@@ -8,7 +8,7 @@
 
 Phone / Tablet → Kagami → OBS / Discord
 
-**Linux · AppImage (x86_64) · Windows in development**
+**Linux · Windows in development**
 
 Local-first · No account · MIT
 
