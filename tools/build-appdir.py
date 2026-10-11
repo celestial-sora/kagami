@@ -74,6 +74,7 @@ def build(appdir, backend):
     tree(Path('/usr/share/glib-2.0/schemas'), appdir / 'usr/share/glib-2.0/schemas')
     tree(ROOT / 'apps/receiver/kagami_receiver', appdir / 'usr/share/kagami/apps/receiver/kagami_receiver')
     copy(ROOT / 'packaging/appimage/appimage_bootstrap.py', appdir / 'usr/share/kagami/appimage_bootstrap.py')
+    copy(ROOT / 'tools/check_receiver_desktop.py', appdir / 'usr/share/kagami/tools/check_receiver_desktop.py')
     copy(ROOT / 'packaging/appimage/AppRun', appdir / 'AppRun')
     (appdir / 'AppRun').chmod(0o755)
     copy(ROOT / 'packaging/appimage/io.kagami.Host.desktop', appdir / 'io.kagami.Host.desktop')

@@ -36,14 +36,13 @@ kagami_distribution() {
             case " ${ID_LIKE:-} " in
                 *' ubuntu '*|*' debian '*) KAGAMI_FAMILY=debian ;;
                 *' arch '*) KAGAMI_FAMILY=arch ;;
-                *' rhel '*|*' centos '*) kagami_fail 'Enterprise Linux is outside the current supported targets.'; return 2 ;;
                 *' fedora '*) KAGAMI_FAMILY=rpm ;;
                 *) kagami_fail "Unsupported distribution: ${ID:-unknown}. Use a Debian, Arch or Fedora family desktop."; return 2 ;;
             esac ;;
     esac
     if [[ ${ID:-} == ubuntu && ${major} -lt 24 ]] ||
        [[ ${ID:-} == debian && ${major} -lt 12 ]]; then
-        kagami_fail 'Use Ubuntu 24.04+ or Debian 12+ and derivatives with Python 3.10+, GTK 4.8+, GStreamer 1.20+.'; return 2
+        kagami_fail 'Use Ubuntu 24.04+ or Debian 12+ and derivatives with Python 3.10+, GTK 4.8+, GStreamer 1.22+.'; return 2
     fi
 }
 kagami_platform() {
@@ -175,7 +174,7 @@ kagami_dependency_packages() {
                 avahi-compat-libdns_sd-devel gstreamer1-devel gstreamer1-plugins-base-devel \
                 avahi python3 python3-gobject python3-cairo python3-gstreamer1 gtk4 \
                 gstreamer1-plugins-base gstreamer1-plugins-good gstreamer1-plugins-bad-free \
-                gstreamer1-plugin-libav iw NetworkManager wpa_supplicant polkit iproute dbus \
+                gstreamer1-plugin-libav gstreamer1-plugin-openh264 openh264 iw NetworkManager wpa_supplicant polkit iproute dbus \
                 v4l-utils dkms mokutil ;;
     esac
 }
@@ -220,8 +219,8 @@ import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Gst', '1.0')
 from gi.repository import Gtk, Gst
-if (Gtk.get_major_version(), Gtk.get_minor_version()) < (4, 8) or Gst.version()[:2] < (1, 20):
-    raise SystemExit('GTK 4.8+ and GStreamer 1.20+ required; use a newer distribution.')
+if (Gtk.get_major_version(), Gtk.get_minor_version()) < (4, 8) or Gst.version()[:2] < (1, 22):
+    raise SystemExit('GTK 4.8+ and GStreamer 1.22+ required; use a newer distribution.')
 PYTHON
 }
 kagami_install_camera_source() {

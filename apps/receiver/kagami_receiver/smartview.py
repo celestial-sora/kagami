@@ -14,11 +14,11 @@ import threading
 import time
 
 from .model import ReceiverError
-from .pipeline import QUEUE, capture_format, gst, pipeline_error
+from .pipeline import QUEUE, capture_format, gst, h264_decoder, H264_DECODERS, pipeline_error
 from .transport import Device, command
 
 HELPER = Path("/usr/local/libexec/kagami-smartview-helper")
-MEDIA_PLUGINS = ("udpsrc", "rtpjitterbuffer", "rtpmp2tdepay", "tsdemux", "h264parse", "avdec_h264")
+MEDIA_PLUGINS = ("udpsrc", "rtpjitterbuffer", "rtpmp2tdepay", "tsdemux", "h264parse")
 
 
 def interface_name(value):
@@ -56,6 +56,7 @@ def preflight(interface):
     checks.append({"name": "network_helper", "ok": installed, "detail": str(HELPER) if installed else "Install the root-owned helper using docs/smartview-ubuntu.md."})
     try:
         Gst = gst()
+        h264_decoder(Gst)
         missing = [name for name in MEDIA_PLUGINS if not Gst.ElementFactory.find(name)]
         checks.append({"name": "miracast_decoder", "ok": not missing, "detail": "H.264/RTP decoder ready" if not missing else "Missing: " + ", ".join(missing)})
     except RuntimeError as exc:
@@ -63,11 +64,13 @@ def preflight(interface):
     return checks
 
 
-def media_description():
+def media_description(decoder="avdec_h264"):
+    if decoder not in H264_DECODERS:
+        raise ValueError("Unsupported H.264 decoder.")
     # Matches MiracleCast's documented external player's MP2T/H.264 receive path.
     return ('udpsrc name=rtp port=7236 timeout=3000000000 caps="application/x-rtp,media=video,clock-rate=90000,encoding-name=MP2T" ! '
             'rtpjitterbuffer latency=100 drop-on-latency=true ! rtpmp2tdepay ! tsdemux ! '
-            f'{QUEUE} ! h264parse ! avdec_h264 ! videoconvert ! video/x-raw,format=I420 ! ')
+            f'{QUEUE} ! h264parse ! video/x-h264,stream-format=byte-stream,alignment=au ! {decoder} ! videoconvert ! video/x-raw,format=I420 ! ')
 
 
 class SmartViewTransport:
@@ -90,7 +93,7 @@ class SmartViewTransport:
         if not self.allow_disconnect:
             raise ReceiverError("permission", "Confirm that the selected Wi-Fi adapter may disconnect while Smart View is running; other adapters stay managed.")
         self.Gst, self.source = gst(), source
-        self.pipeline = self.Gst.parse_launch(media_description() + "v4l2sink name=screen sync=false")
+        self.pipeline = self.Gst.parse_launch(media_description(h264_decoder(self.Gst)) + "v4l2sink name=screen sync=false")
         screen = self.pipeline.get_by_name("screen")
         screen.set_property("device", source)
         screen.get_static_pad("sink").add_probe(self.Gst.PadProbeType.BUFFER, self._frame)

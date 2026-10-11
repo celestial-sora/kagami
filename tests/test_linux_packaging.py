@@ -20,7 +20,8 @@ class LinuxPackagingTests(unittest.TestCase):
             ('linuxmint', '22', 'ubuntu debian', 'debian'), ('pop', '24.04', 'ubuntu', 'debian'),
             ('arch', '', '', 'arch'), ('endeavouros', '', 'arch', 'arch'),
             ('manjaro', '26.0', 'arch', 'arch'), ('fedora', '44', '', 'rpm'),
-            ('myremix', '1', 'fedora', 'rpm')):
+            ('myremix', '1', 'fedora', 'rpm'),
+            ('nobara', '44', 'rhel centos fedora', 'rpm')):
             with self.subTest(name=name):
                 result = shell('kagami_distribution\nprintf "%s" "$KAGAMI_FAMILY"',
                                ID=name, VERSION_ID=version, ID_LIKE=like)

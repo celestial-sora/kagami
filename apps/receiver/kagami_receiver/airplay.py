@@ -14,11 +14,11 @@ import threading
 import time
 
 from .model import ReceiverError
-from .pipeline import QUEUE, capture_format, gst, pipeline_error
+from .pipeline import QUEUE, capture_format, gst, h264_decoder, H264_DECODERS, pipeline_error
 from .transport import Device, command
 from .v4l2 import set_output_fps
 
-MEDIA_PLUGINS = ("udpsrc", "rtph264depay", "h264parse", "avdec_h264")
+MEDIA_PLUGINS = ("udpsrc", "rtph264depay", "h264parse")
 AUDIO_PLUGINS = ("avdec_aac", "avdec_alac", "audioconvert", "audioresample", "volume", "level", "pulsesink")
 AUDIO_SINK = "pulsesink client-name=Kagami"
 EVENTS_VERSION = "KAGAMI_AIRPLAY_EVENTS_V1"
@@ -56,6 +56,7 @@ def preflight():
         checks.append({"name": "airplay_discovery", "ok": False, "detail": str(exc)})
     try:
         Gst = gst()
+        h264_decoder(Gst)
         missing = [name for name in MEDIA_PLUGINS if not Gst.ElementFactory.find(name)]
         checks.append({"name": "airplay_decoder", "ok": not missing,
                        "detail": "H.264/RTP decoder ready" if not missing else "Missing: " + ", ".join(missing)})
@@ -68,13 +69,15 @@ def preflight():
     return checks
 
 
-def media_description(fps):
+def media_description(fps, decoder="avdec_h264"):
+    if decoder not in H264_DECODERS:
+        raise ValueError("Unsupported H.264 decoder.")
     if type(fps) is not int or not 1 <= fps <= 60:
         raise ValueError("Use 1–60 FPS.")
     return ('udpsrc name=rtp address=127.0.0.1 timeout=3000000000 '
             'caps="application/x-rtp,media=video,clock-rate=90000,encoding-name=H264,payload=96" ! '
             'rtph264depay ! '
-            f'h264parse ! avdec_h264 ! {QUEUE} ! videoconvert ! videoscale add-borders=true ! videorate skip-to-first=true ! '
+            f'h264parse ! video/x-h264,stream-format=byte-stream,alignment=au ! {decoder} ! {QUEUE} ! videoconvert ! videoscale add-borders=true ! videorate skip-to-first=true ! '
             f'video/x-raw,format=I420,width=1280,height=720,pixel-aspect-ratio=1/1,framerate={fps}/1 ! ')
 
 
@@ -106,7 +109,7 @@ class AirPlayTransport:
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as reservation:
                 reservation.bind(("127.0.0.1", 0))
                 port = reservation.getsockname()[1]
-            self.pipeline = self.Gst.parse_launch(media_description(fps) + "v4l2sink name=screen sync=false")
+            self.pipeline = self.Gst.parse_launch(media_description(fps, h264_decoder(self.Gst)) + "v4l2sink name=screen sync=false")
             self.pipeline.get_by_name("rtp").set_property("port", port)
             screen = self.pipeline.get_by_name("screen")
             screen.set_property("device", source)

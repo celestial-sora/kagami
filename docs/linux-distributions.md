@@ -6,7 +6,7 @@ Ubuntu remains the primary desktop. The current development installer also selec
 | --- | --- | --- |
 | Ubuntu 24.04 / 26.04 and newer | apt | Matching `linux-headers-$(uname -r)` |
 | Debian 12 / 13 and newer | apt | Matching kernel headers |
-| Ubuntu/Debian derivatives (Mint, Pop!_OS, etc.) | apt, detected through `ID_LIKE` | Python 3.10+, GTK 4.8+, GStreamer 1.20+; matching kernel headers |
+| Ubuntu/Debian derivatives (Mint, Pop!_OS, etc.) | apt, detected through `ID_LIKE` | Python 3.10+, GTK 4.8+, GStreamer 1.22+; matching kernel headers |
 | Arch and Arch derivatives (EndeavourOS, Manjaro, etc.) | pacman | Full system upgrade; headers selected from the installed kernel package owner |
 | Fedora and Fedora derivatives | dnf | Supported mutable workstation release; matching `kernel-devel-$(uname -r)` |
 
@@ -26,11 +26,11 @@ Debian/Ubuntu and Arch use their packaged `v4l2loopback-dkms` and tooling. On Fe
 
 Arch performs `pacman -Syu` before dependency installation to avoid unsupported partial upgrades. The running kernel must still have an installed package and matching headers after that upgrade. If it was replaced, the installer returns **10**, reports kernel setup pending, and asks you to reboot and rerun; it does not pretend the application installation completed. Custom/AUR-only kernel headers must already be provided by the user; no AUR helper or root AUR build is invoked.
 
-Fedora uses signed configured DNF repositories. Missing packages fail visibly. The installer does not silently add RPM Fusion, disable signature checking, change firewall rules or disable SELinux. If `avdec_h264`, `avdec_aac` or `avdec_alac` are missing, install the appropriate codec-enabled packages for your release/repositories and rerun. The software preflight checks actual plugin availability, rather than accepting package installation as decoder evidence. With a firewall, allow AirPlay/mDNS on the trusted LAN yourself; see [AirPlay](airplay-ubuntu.md). RPM kernel development packages must match the running kernel exactly; reboot into an installed supported kernel if the old development package is no longer available.
+Fedora uses signed configured DNF repositories. Missing packages fail visibly. The installer does not silently add RPM Fusion, disable signature checking, change firewall rules or disable SELinux. For video, Kagami prefers `avdec_h264` and falls back to `openh264dec`. Fedora installs `openh264` and `gstreamer1-plugin-openh264` from its configured signed repositories; Fedora Cisco OpenH264 must be available. If neither H.264 decoder or the `avdec_aac`/`avdec_alac` audio decoders are available, install the appropriate codec-enabled packages for your release/repositories and rerun. The software preflight checks actual plugin availability, rather than accepting package installation as decoder evidence. With a firewall, allow AirPlay/mDNS on the trusted LAN yourself; see [AirPlay](airplay-ubuntu.md). RPM kernel development packages must match the running kernel exactly; reboot into an installed supported kernel if the old development package is no longer available.
 
 Secure Boot uses the distribution's DKMS signing certificate/MOK flow. Missing signing setup is an actionable failure; enrollment/reboot remains pending with exit 10. Secure Boot is never disabled. Fedora's security policy may require administrator-specific setup; no permissive SELinux policy is installed.
 
-Package sources: [Debian v4l2loopback](https://packages.debian.org/search?keywords=v4l2loopback), [Arch kernel/header guidance](https://wiki.archlinux.org/title/V4l2loopback), [Fedora GStreamer libav package](https://packages.fedoraproject.org/pkgs/gstreamer1-plugin-libav/gstreamer1-plugin-libav/).
+Package sources: [Debian v4l2loopback](https://packages.debian.org/search?keywords=v4l2loopback), [Arch kernel/header guidance](https://wiki.archlinux.org/title/V4l2loopback), [Fedora GStreamer libav package](https://packages.fedoraproject.org/pkgs/gstreamer1-plugin-libav/gstreamer1-plugin-libav/), [Fedora OpenH264 guidance](https://fedoraproject.org/wiki/OpenH264).
 
 ## AppImage
 
