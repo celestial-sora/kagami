@@ -31,6 +31,18 @@ def gst():
     return Gst
 
 
+H264_DECODERS = ('avdec_h264', 'openh264dec')
+
+
+def h264_decoder(Gst=None):
+    """Prefer libav; Fedora can use its supported Cisco OpenH264 package."""
+    Gst = Gst if Gst is not None else gst()
+    for name in H264_DECODERS:
+        if Gst.ElementFactory.find(name):
+            return name
+    raise ReceiverError('decoder', 'Install an H.264 decoder: avdec_h264 or openh264dec (Fedora: openh264 + gstreamer1-plugin-openh264).')
+
+
 def capture_format(path):
     """Wait for exclusive_caps to advertise a producer and a negotiated size."""
     fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK)

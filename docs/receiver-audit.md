@@ -7,3 +7,7 @@ The current installer builds pinned MiracleCast/UxPlay as the ordinary user and 
 The authoring host is Ubuntu 26.04, RTL8821CE [10ec:c821], driver rtw88_8821ce, lacking advertised P2P modes. Windows Miracast history narrows the present blocker to Linux-driver capabilities; no replacement-driver or host network changes were performed. AirPlay uses same-LAN Avahi and does not need P2P.
 
 The authorized Ubuntu 26.04 installer now passes with AirPlay despite missing P2P, including actual DKMS/module/camera setup and black waiting frames through video10. Physical Apple/Galaxy media, OBS, network restoration, enabled Secure Boot and post-reboot acceptance remain open. See [validation](validation.md).
+
+## Multi-distribution/AppImage extension · 2026-10-11
+
+The active V2 installer now includes apt (Ubuntu/Debian), pacman (Arch) and dnf (Fedora) paths plus an x86_64 AppImage builder. Red Hat is excluded by the latest maintainer direction. The native camera identity guard, selected-adapter broker, shared media pipeline, no-recording and local settings requirements are unchanged. AppImage bundles userspace runtime/UxPlay only; privileged services/driver and hardware acceptance remain host requirements. See [Linux distributions](linux-distributions.md) and [validation](validation.md). Contributor: celestail-sora.

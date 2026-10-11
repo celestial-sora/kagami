@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Kagami
+Comment=Phone screen to virtual camera
+Exec=kagami
+Icon=io.kagami.Host
+Terminal=false
+Categories=AudioVideo;Video;
+StartupNotify=true

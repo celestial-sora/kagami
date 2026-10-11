@@ -1,3 +1,5 @@
+> Development installer: Ubuntu/Debian, Arch and Fedora families plus AppImage; see [Linux distributions](linux-distributions.md). The stable command below keeps its published release scope until a new release is authorized.
+
 # One-command Ubuntu installation
 
 Run in a terminal as your ordinary desktop user on Ubuntu 24.04 or 26.04:

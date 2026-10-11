@@ -36,7 +36,8 @@ jobs:
       - run: |
           shellcheck install.sh tools/build-miraclecast.sh tools/build-uxplay.sh \
             packaging/fedora/kagami-camera-setup packaging/fedora/kagami-receiver-camera-setup \
-            packaging/ubuntu/kagami-smartview-session tools/test-pattern.sh tools/run-receiver.sh
+            packaging/ubuntu/kagami-smartview-session tools/test-pattern.sh tools/run-receiver.sh \
+            tools/build-v4l2loopback.sh tools/build-appimage.sh packaging/appimage/AppRun
           bash install.sh --dry-run
           python3 tools/install_receiver.py prepare --config /tmp/kagami/settings.json --interface wlan2
           python3 tools/install_receiver.py launchers --root /tmp/kagami --config /tmp/kagami/settings.json --data /tmp/kagami-desktop
@@ -53,7 +54,7 @@ jobs:
             gstreamer1.0-plugins-ugly gstreamer1.0-libav xvfb build-essential meson ninja-build \
             cmake pkg-config libglib2.0-dev libreadline-dev libudev-dev libsystemd-dev libssl-dev \
             libplist-dev libavahi-compat-libdnssd-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
-            avahi-daemon avahi-utils
+            avahi-daemon avahi-utils linux-headers-generic
       - run: |
           bash tools/build-miraclecast.sh /tmp/kagami-miracle-source /tmp/kagami-miracle-stage
           /tmp/kagami-miracle-stage/usr/local/bin/miracle-wifid --help
@@ -66,5 +67,138 @@ jobs:
           /tmp/kagami-airplay-stage/usr/local/bin/uxplay -rc /dev/null -h
           sudo systemctl start avahi-daemon.service
           python3 tools/check_airplay_backend.py /tmp/kagami-airplay-stage/usr/local/bin/uxplay
+      - name: Compile staged DKMS source without installing/loading any module
+        run: |
+          bash tools/build-v4l2loopback.sh /tmp/kagami-loopback-source /tmp/kagami-loopback-stage
+          kernel_makefile=$(printf '%s\n' /usr/src/linux-headers-*-generic/Makefile | sort -V | tail -n 1)
+          test -f "$kernel_makefile"
+          make -C /tmp/kagami-loopback-stage/usr/src/v4l2loopback-0.15.4 "KERNEL_DIR=${kernel_makefile%/Makefile}" v4l2loopback
+          test -s /tmp/kagami-loopback-stage/usr/src/v4l2loopback-0.15.4/v4l2loopback.ko
       - run: G_DEBUG=fatal-criticals KAGAMI_TEST_GST=1 /usr/bin/python3 -m unittest discover -s tests -v
       - run: G_DEBUG=fatal-criticals xvfb-run -a /usr/bin/python3 tools/check_receiver_desktop.py
+
+  distributions:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: debian:12
+            family: debian
+          - image: debian:13
+            family: debian
+          - image: archlinux:base
+            family: arch
+          - image: fedora:44
+            family: rpm
+    container: ${{ matrix.image }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Prepare disposable container repositories
+        run: |
+          case '${{ matrix.family }}' in
+            debian) apt-get update; apt-get install -y git ca-certificates ;;
+            arch) pacman -Syu --noconfirm; pacman -S --noconfirm git ;;
+            rpm)
+              dnf install -y git
+              ;;
+          esac
+      - uses: actions/checkout@v7.0.1
+      - name: Install the actual distribution dependency manifest
+        run: |
+          source install.sh
+          source /etc/os-release
+          kagami_distribution
+          test "$KAGAMI_FAMILY" = '${{ matrix.family }}'
+          mapfile -t packages < <(kagami_dependency_packages)
+          case "$KAGAMI_FAMILY" in
+            debian) apt-get install -y "${packages[@]}" ;;
+            arch) pacman -S --needed --noconfirm "${packages[@]}" ;;
+            rpm) dnf install -y --setopt=gpgcheck=1 "${packages[@]}" ;;
+          esac
+          useradd -m kagami-ci
+          chown -R kagami-ci:kagami-ci "$GITHUB_WORKSPACE"
+      - name: Runtime, contracts and unprivileged pinned backend builds
+        run: |
+          codec_args=()
+          if test '${{ matrix.family }}' = rpm; then codec_args=(--synthetic-h264); fi
+          runuser -u kagami-ci -- env PYTHONPATH="$GITHUB_WORKSPACE/apps/receiver" G_DEBUG=fatal-criticals python3 tools/check-linux-runtime.py "${codec_args[@]}"
+          runuser -u kagami-ci -- python3 -m unittest discover -s tests -v
+          runuser -u kagami-ci -- bash tools/build-miraclecast.sh /tmp/miracle-source /tmp/miracle-stage
+          runuser -u kagami-ci -- bash tools/build-uxplay.sh /tmp/uxplay-source /tmp/uxplay-stage
+          runuser -u kagami-ci -- bash tools/build-v4l2loopback.sh /tmp/loopback-source /tmp/loopback-stage
+          runuser -u kagami-ci -- /tmp/miracle-stage/usr/local/bin/miracle-wifid --help
+          runuser -u kagami-ci -- /tmp/uxplay-stage/usr/local/bin/uxplay -rc /dev/null -h
+          runuser -u kagami-ci -- /tmp/loopback-stage/usr/local/bin/v4l2loopback-ctl --help
+  appimage:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Install packaging/runtime build prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y patchelf squashfs-tools desktop-file-utils xvfb fonts-dejavu-core \
+            python3-gi python3-gi-cairo python3-gst-1.0 gir1.2-gtk-4.0 \
+            gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
+            gstreamer1.0-libav build-essential cmake pkg-config libssl-dev libplist-dev \
+            libavahi-compat-libdnssd-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+      - name: Build and relocate AppImage; test packaged GTK and media
+        run: |
+          bash tools/build-appimage.sh "$RUNNER_TEMP/appimage"
+          desktop-file-validate "$RUNNER_TEMP/appimage/Kagami.AppDir/io.kagami.Host.desktop"
+          mkdir -p "$RUNNER_TEMP/relocated image"
+          cd "$RUNNER_TEMP/relocated image"
+          "$RUNNER_TEMP/appimage/"Kagami-*-x86_64.AppImage --appimage-extract > /dev/null
+          G_DEBUG=fatal-criticals ./squashfs-root/AppRun --appimage-check
+          G_DEBUG=fatal-criticals xvfb-run -a ./squashfs-root/AppRun --appimage-gtk-check
+      - uses: actions/upload-artifact@v7
+        with:
+          name: kagami-appimage-x86_64
+          path: |
+            ${{ runner.temp }}/appimage/Kagami-*-x86_64.AppImage
+            ${{ runner.temp }}/appimage/SHA256SUMS
+  appimage-distributions:
+    needs: appimage
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: debian:13
+            family: debian
+          - image: archlinux:base
+            family: arch
+          - image: fedora:44
+            family: rpm
+    container: ${{ matrix.image }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Prepare display/host graphics only (no host Python/GTK/GStreamer)
+        run: |
+          case '${{ matrix.family }}' in
+            debian) apt-get update; apt-get install -y xvfb xauth libegl1 libgl1 libgl1-mesa-dri dbus ;;
+            arch) pacman -Syu --noconfirm; pacman -S --noconfirm xorg-server-xvfb xorg-xauth mesa libglvnd dbus ;;
+            rpm) dnf install -y xorg-x11-server-Xvfb xorg-x11-xauth mesa-libEGL mesa-libGL dbus-daemon ;;
+          esac
+          if test ! -s /etc/machine-id; then dbus-uuidgen > /etc/machine-id; fi
+          useradd -m kagami-ci
+      - uses: actions/download-artifact@v8.0.2
+        with:
+          name: kagami-appimage-x86_64
+          path: /tmp/kagami-image
+      - name: Check identical bundled runtime and actual receiver window
+        run: |
+          cd /tmp/kagami-image
+          sha256sum --check SHA256SUMS
+          chmod +x Kagami-*-x86_64.AppImage
+          chown -R kagami-ci:kagami-ci /tmp/kagami-image
+          runuser -u kagami-ci -- bash -c './Kagami-*-x86_64.AppImage --appimage-extract > /dev/null'
+          runuser -u kagami-ci -- env G_DEBUG=fatal-criticals ./squashfs-root/AppRun --appimage-check
+          runuser -u kagami-ci -- env G_DEBUG=fatal-criticals GSK_RENDERER=cairo dbus-run-session -- xvfb-run -a ./squashfs-root/AppRun --appimage-gtk-check
