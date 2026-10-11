@@ -72,6 +72,18 @@ def build(appdir, backend):
     if (appdir / 'usr/lib/gio/modules').exists():
         subprocess.run(['gio-querymodules', str(appdir / 'usr/lib/gio/modules')], check=True)
     tree(Path('/usr/share/glib-2.0/schemas'), appdir / 'usr/share/glib-2.0/schemas')
+    # Bare hosts may have neither fontconfig defaults nor scalable fonts. Keep
+    # a licensed fallback while retaining the user's normal host font choices.
+    fonts = Path('/usr/share/fonts/truetype/dejavu')
+    if not (fonts / 'DejaVuSans.ttf').is_file():
+        raise ValueError('Install fonts-dejavu-core on the AppImage builder.')
+    tree(fonts, appdir / 'usr/share/fonts/truetype/dejavu')
+    tree(Path('/etc/fonts'), appdir / 'etc/fonts')
+    font_config = appdir / 'etc/fonts/fonts.conf'
+    text = font_config.read_text()
+    text = text.replace('<fontconfig>', '<fontconfig>\n <dir prefix="relative">../../usr/share/fonts</dir>', 1)
+    font_config.write_text(text)
+
     tree(ROOT / 'apps/receiver/kagami_receiver', appdir / 'usr/share/kagami/apps/receiver/kagami_receiver')
     copy(ROOT / 'packaging/appimage/appimage_bootstrap.py', appdir / 'usr/share/kagami/appimage_bootstrap.py')
     copy(ROOT / 'tools/check_receiver_desktop.py', appdir / 'usr/share/kagami/tools/check_receiver_desktop.py')

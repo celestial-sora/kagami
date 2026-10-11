@@ -3,6 +3,8 @@ set -eu
 if [ "$(id -u)" = 0 ]; then echo 'Run Kagami as your desktop user, never as root.' >&2; exit 2; fi
 kagami_appdir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 export PATH="$kagami_appdir/usr/bin:/usr/local/bin:/usr/bin:/bin"
+export FONTCONFIG_PATH="$kagami_appdir/etc/fonts"
+export FONTCONFIG_FILE="$kagami_appdir/etc/fonts/fonts.conf"
 export GI_TYPELIB_PATH="$kagami_appdir/usr/lib/girepository-1.0"
 export GST_PLUGIN_SYSTEM_PATH_1_0="$kagami_appdir/usr/lib/gstreamer-1.0"
 export GST_PLUGIN_PATH_1_0=

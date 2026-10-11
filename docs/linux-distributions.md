@@ -36,7 +36,7 @@ Package sources: [Debian v4l2loopback](https://packages.debian.org/search?keywor
 
 The initial artifact is **x86_64**. CI builds on Ubuntu 24.04 with a **glibc 2.39** baseline for Ubuntu 24.04+, Debian 13+, current Arch and current Fedora. Debian 12 (glibc 2.36) should use the native installer; this AppImage is not promised there. Building on a newer host raises the binary compatibility floor. AppImage does not imply support for every Linux distribution.
 
-The AppImage bundles Python, PyGObject/Cairo, GTK4, GStreamer, the required media plugins and Kagami's patched pinned UxPlay. Every bundled ELF uses a relative RPATH; no library-search environment is leaked into host `pkexec`, systemctl or the fixed privileged broker. It preserves the approved RGBA artwork, packages library licenses, uses the normal XDG settings/cache directories, and never automatically starts reception or records media.
+The AppImage bundles Python, PyGObject/Cairo, GTK4, GStreamer, the required media plugins, licensed DejaVu fallback fonts/fontconfig and Kagami's patched pinned UxPlay. Every bundled ELF uses a relative RPATH; no library-search environment is leaked into host `pkexec`, systemctl or the fixed privileged broker. It preserves the approved RGBA artwork, packages library licenses, uses the normal XDG settings/cache directories, and never automatically starts reception or records media.
 
 **Host prerequisites remain required:** the matching V4L2 kernel driver, two named camera nodes/ACLs, Avahi on the same LAN and desktop audio. Smart View additionally requires the installed fixed root-owned helper, MiracleCast and an adapter advertising P2P client/GO. USB/ADB Wi-Fi still require host adb and scrcpy 3+. These privileged/hardware prerequisites cannot live inside an AppImage. Run the native installer once on a supported host; then the AppImage can run independently of the installed app payload.
 
@@ -64,7 +64,7 @@ APPIMAGE_EXTRACT_AND_RUN=1 ./Kagami-2.1.0-x86_64.AppImage --appimage-check
 
 ### Build as a normal user
 
-Use an Ubuntu 24.04 builder with the runtime dependencies from the installer plus `patchelf`, `squashfs-tools`, and build prerequisites for UxPlay. No root operations occur in this command:
+Use an Ubuntu 24.04 builder with the runtime dependencies from the installer plus `patchelf`, `squashfs-tools`, `fonts-dejavu-core`, and build prerequisites for UxPlay. No root operations occur in this command:
 
 ```bash
 bash tools/build-appimage.sh "$PWD/.local/appimage-build"
