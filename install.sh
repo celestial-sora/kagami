@@ -185,7 +185,8 @@ kagami_arch_kernel_package() {
         owner=$(cat "/usr/lib/modules/$running/pkgbase")
     fi
     if [[ -z $owner ]]; then
-        kagami_log 'Kernel setup pending: running Arch kernel is no longer installed after the full upgrade. Reboot into the installed kernel and rerun.'; return 10
+        kagami_log "Kernel setup pending: running Arch kernel $running is not installed on this system, so matching headers cannot be selected. Reboot into an installed kernel and rerun the installer." >&2
+        return 10
     fi
     [[ $owner =~ ^[a-zA-Z0-9][a-zA-Z0-9+_.-]*$ ]] || { kagami_fail 'Invalid kernel package name.'; return 2; }
     printf '%s-headers\n' "$owner"
