@@ -32,34 +32,37 @@ Kagami turns a compatible phone or tablet screen into a **V4L2 virtual camera** 
 
 ## Install
 
-**Linux development installer** (Ubuntu, Debian, Arch, Manjaro, EndeavourOS and Fedora families):
+### Stable release · Recommended
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/celestial-sora/kagami/main/install.sh | bash
-```
+**Ubuntu 24.04 / 26.04 and Manjaro Linux**
 
-Run as your **normal desktop user**, not with `sudo` in front of the command. The installer requests authentication only for system prerequisites. Running the same command again checks for updates.
-
-> [!NOTE]
-> This installs the latest **development** commit, not a pinned stable release. The published stable installer may support fewer distributions. Check [Releases](https://github.com/celestial-sora/kagami/releases/latest) for the latest published assets and release notes.
-
-<details>
-<summary><strong>Stable installer · Ubuntu 24.04 / 26.04</strong></summary>
+Install the latest published stable version:
 
 ```bash
 curl -fsSL https://github.com/celestial-sora/kagami/releases/latest/download/install-kagami.sh | bash
 ```
 
-Use the stable command only on the platforms supported by the release's own notes. It may not include the newer Arch/Manjaro/Fedora installer changes.
+The latest stable release includes Manjaro support, confirmed by maintainer testing. Run as your **normal desktop user**; the installer requests system authentication when needed. [View the latest release and version →](https://github.com/celestial-sora/kagami/releases/latest)
+
+<details>
+<summary><strong>Development (Beta) · Testing new changes</strong></summary>
+
+Use this build for the latest work on `main`, including broader Debian, Arch-based and Fedora support. It may be less stable than a published release.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/celestial-sora/kagami/main/install.sh | bash
+```
+
+This tracks the latest development commit, **not** a stable version. Report bugs in [Issues](https://github.com/celestial-sora/kagami/issues).
 
 </details>
 
 <details>
 <summary><strong>AppImage · x86_64</strong></summary>
 
-Find the AppImage artifact in [successful CI runs](https://github.com/celestial-sora/kagami/actions/workflows/ci.yml) or in a release when one is attached.
+Find the AppImage in [successful CI runs](https://github.com/celestial-sora/kagami/actions/workflows/ci.yml) or as a release attachment when available.
 
-The AppImage still needs host camera drivers, camera node permissions and discovery services. Follow the [AppImage setup guide](docs/linux-distributions.md#appimage) before running it.
+Host camera drivers and discovery services are still required. See the [AppImage guide](docs/linux-distributions.md#appimage).
 
 </details>
 
@@ -69,7 +72,8 @@ The AppImage still needs host camera drivers, camera node permissions and discov
 | :-- | :-- | :-- |
 | **Ubuntu 24.04 / 26.04** | `apt` | Real iPad → Kagami → OBS verified on Ubuntu 26.04 |
 | **Debian 12+** · Linux Mint · Pop!_OS | `apt` | Userspace CI; desktop/device testing pending |
-| **Arch Linux** · **Manjaro** · **EndeavourOS** | `pacman` | Arch userspace CI; Manjaro/EndeavourOS device testing pending |
+| **Manjaro Linux** | `pacman` | Stable release tested by maintainer; device-specific features may vary |
+| **Arch Linux** · **EndeavourOS** | `pacman` | Arch userspace CI; device testing pending |
 | **Fedora Workstation** and compatible derivatives | `dnf` | Userspace CI; desktop/device testing pending |
 
 **Requirements:** systemd desktop, Python 3.10+, GTK 4.8+, GStreamer 1.22+, matching headers for your running kernel, and V4L2 camera support.
