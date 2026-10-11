@@ -12,7 +12,7 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/celestial-sora/kagami/ci.yml?branch=main&label=Checks&style=flat-square)](https://github.com/celestial-sora/kagami/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-555?style=flat-square)](LICENSE)
 
-[**Install**](#install) · [**Supported Linux**](#linux-support) · [**How it works**](#how-it-works) · [**Latest release**](https://github.com/celestial-sora/kagami/releases/latest)
+[**Install**](#install) · [**Windows Support**](https://github.com/celestial-sora/kagami-win) · [**Supported Linux**](#linux-support) · [**How it works**](#how-it-works) · [**Latest release**](https://github.com/celestial-sora/kagami/releases/latest)
 
 <img src="assets/screenshots/kagami-airplay-ipad.png" alt="iPad AirPlay mirroring in the Kagami desktop app" width="760">
 
@@ -65,6 +65,8 @@ Find the AppImage in [successful CI runs](https://github.com/celestial-sora/kaga
 Host camera drivers and discovery services are still required. See the [AppImage guide](docs/linux-distributions.md#appimage).
 
 </details>
+
+**Windows support:** See [Kagami for Windows →](https://github.com/celestial-sora/kagami-win) (separate repository).
 
 ## Linux support
 
