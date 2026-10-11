@@ -34,7 +34,7 @@ Kagami turns a compatible phone or tablet screen into a **V4L2 virtual camera** 
 
 ### Stable release · Recommended
 
-**Ubuntu 24.04 / 26.04 · Arch-based Linux (Arch, Manjaro, EndeavourOS, CachyOS)**
+**Ubuntu · Debian · Arch / Arch-based**
 
 Install the latest published stable version:
 
@@ -42,7 +42,7 @@ Install the latest published stable version:
 curl -fsSL https://github.com/celestial-sora/kagami/releases/latest/download/install-kagami.sh | bash
 ```
 
-The stable installer supports the Arch-based package family through `pacman`. **Manjaro has been tested by the maintainer**; Arch Linux, EndeavourOS, CachyOS and other derivatives share the installation path but still need separate real-device verification. Package repositories and kernel headers can differ between distributions. Run as your **normal desktop user**; the installer requests system authentication when needed. [View the latest release and version →](https://github.com/celestial-sora/kagami/releases/latest)
+The stable installer uses `apt` for Ubuntu/Debian and `pacman` for Arch-based distributions. **Ubuntu and Manjaro have been tested on real desktops**; Debian and other Arch derivatives still need separate device testing. Kernel headers and package availability can differ. Run as your **normal desktop user**; the installer requests system authentication when needed. [View the latest release and version →](https://github.com/celestial-sora/kagami/releases/latest)
 
 <details>
 <summary><strong>Development (Beta) · Testing new changes</strong></summary>
